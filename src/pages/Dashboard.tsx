@@ -3,13 +3,13 @@ import { motion } from "framer-motion";
 import {
   TrendingUp, Package, Zap, ShoppingCart, Users, AlertTriangle,
   ArrowRight, ArrowUpRight, ArrowDownRight, Wallet, BarChart3,
-  Clock, CalendarDays, Activity, Sun, Moon, Globe, FileText,
+  Clock, CalendarDays, Activity, Sun, Moon, Globe, FileText, Bell,
 } from "lucide-react";
 import umiyaLogo from "@/assets/umiya-logo.png";
 import { useNavigate } from "react-router-dom";
 import { useI18n, type Lang } from "@/hooks/use-i18n";
 import { useTheme } from "@/hooks/use-theme";
-import { useSales, useProducts, useCustomers } from "@/hooks/use-offline-store";
+import { useSales, useProducts, useCustomers, useReminders } from "@/hooks/use-offline-store";
 
 const langLabels: Record<Lang, string> = { en: "EN", hi: "हिं", gu: "ગુ" };
 const langOrder: Lang[] = ["en", "hi", "gu"];
@@ -40,6 +40,12 @@ export default function Dashboard() {
   const { items: sales } = useSales();
   const { items: products } = useProducts();
   const { items: customers } = useCustomers();
+  const { items: reminders } = useReminders();
+
+  const remindersDueToday = useMemo(() => {
+    const now = Date.now();
+    return reminders.filter(r => r.status === "Active" && r.nextDueAt <= now + 86400000);
+  }, [reminders]);
 
   const today = new Date();
   const dateStr = today.toLocaleDateString(lang === "hi" ? "hi-IN" : lang === "gu" ? "gu-IN" : "en-IN", { weekday: "short", day: "numeric", month: "short" });
@@ -254,7 +260,25 @@ export default function Dashboard() {
                 ))}
               </div>
             )}
+        </motion.div>
+
+        {/* ── REMINDERS DUE TODAY ── */}
+        {remindersDueToday.length > 0 && (
+          <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={11.5}
+            className="glass-strong rounded-2xl shadow-brand p-5 md:p-6 cursor-pointer hover:bg-card/70 transition-colors"
+            onClick={() => navigate("/automations")}>
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 rounded-xl bg-brand-warning/10 border border-brand-warning/20 flex items-center justify-center">
+                <Bell className="h-5 w-5 text-brand-warning" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-foreground">{remindersDueToday.length} reminder{remindersDueToday.length !== 1 ? "s" : ""} due</p>
+                <p className="text-xs text-muted-foreground">AMC, service & payment follow-ups</p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-muted-foreground/50" />
+            </div>
           </motion.div>
+        )}
         </div>
 
         {/* ── RECENT ACTIVITY FEED ── */}

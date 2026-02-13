@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Sales from "./pages/Sales";
@@ -20,6 +21,9 @@ import NotFound from "./pages/NotFound";
 import Stores from "./pages/Stores";
 import JobCards from "./pages/JobCards";
 import PublicStore from "./pages/PublicStore";
+import Auth from "./pages/Auth";
+import Onboarding from "./pages/Onboarding";
+import Automations from "./pages/Automations";
 
 const queryClient = new QueryClient();
 
@@ -35,8 +39,10 @@ const App = () => (
           <Route path="/stores" element={<Stores />} />
           <Route path="/store/:slug" element={<PublicStore />} />
           <Route path="/pos" element={<POS />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/onboarding" element={<Onboarding />} />
           {/* Business app — with sidebar/bottom nav */}
-          <Route element={<AppLayout />}>
+          <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/sales" element={<Sales />} />
             <Route path="/inventory" element={<Inventory />} />
@@ -46,6 +52,7 @@ const App = () => (
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/online-store" element={<OnlineStore />} />
             <Route path="/job-cards" element={<JobCards />} />
+            <Route path="/automations" element={<Automations />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/more" element={<More />} />
           </Route>

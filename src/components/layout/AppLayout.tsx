@@ -14,11 +14,15 @@ import {
   Sun,
   Moon,
   Globe,
+  Bell,
+  LogOut,
+  Wrench,
 } from "lucide-react";
 import umiyaLogo from "@/assets/umiya-logo.png";
 import { cn } from "@/lib/utils";
 import { useI18n, type Lang } from "@/hooks/use-i18n";
 import { useTheme } from "@/hooks/use-theme";
+import { useAuth } from "@/hooks/use-auth";
 
 const langLabels: Record<Lang, string> = { en: "EN", hi: "हिं", gu: "ગુ" };
 const langOrder: Lang[] = ["en", "hi", "gu"];
@@ -26,18 +30,25 @@ const langOrder: Lang[] = ["en", "hi", "gu"];
 export function AppLayout() {
   const { t, lang, setLang } = useI18n();
   const { theme, toggleTheme } = useTheme();
+  const { user, role, signOut, isConfigured } = useAuth();
 
-  const sidebarLinks = [
-    { to: "/dashboard", icon: LayoutDashboard, label: t("nav.dashboard") },
-    { to: "/sales", icon: ShoppingCart, label: t("nav.sales") },
-    { to: "/inventory", icon: Package, label: t("nav.inventory") },
-    { to: "/purchase", icon: Truck, label: t("nav.purchases") },
-    { to: "/expenses", icon: Wallet, label: t("nav.expenses") },
-    { to: "/customers", icon: Users, label: t("nav.customers") },
-    { to: "/online-store", icon: Store, label: t("nav.onlineStore") },
-    { to: "/reports", icon: BarChart3, label: t("nav.reports") },
-    { to: "/settings", icon: Settings, label: t("nav.settings") },
+  const allLinks = [
+    { to: "/dashboard", icon: LayoutDashboard, label: t("nav.dashboard"), roles: ["owner", "cashier", "technician"] },
+    { to: "/sales", icon: ShoppingCart, label: t("nav.sales"), roles: ["owner", "cashier"] },
+    { to: "/inventory", icon: Package, label: t("nav.inventory"), roles: ["owner"] },
+    { to: "/purchase", icon: Truck, label: t("nav.purchases"), roles: ["owner"] },
+    { to: "/expenses", icon: Wallet, label: t("nav.expenses"), roles: ["owner"] },
+    { to: "/customers", icon: Users, label: t("nav.customers"), roles: ["owner", "cashier"] },
+    { to: "/job-cards", icon: Wrench, label: "Job Cards", roles: ["owner", "technician"] },
+    { to: "/online-store", icon: Store, label: t("nav.onlineStore"), roles: ["owner"] },
+    { to: "/reports", icon: BarChart3, label: t("nav.reports"), roles: ["owner"] },
+    { to: "/automations", icon: Bell, label: "Automations", roles: ["owner"] },
+    { to: "/settings", icon: Settings, label: t("nav.settings"), roles: ["owner"] },
   ];
+
+  const sidebarLinks = isConfigured
+    ? allLinks.filter(l => l.roles.includes(role))
+    : allLinks;
 
   const cycleLang = () => {
     const idx = langOrder.indexOf(lang);
@@ -88,8 +99,19 @@ export function AppLayout() {
             ))}
           </nav>
 
-          {/* Footer with theme + lang toggles */}
+          {/* Footer with theme + lang + auth toggles */}
           <div className="p-4 border-t border-sidebar-border/30 space-y-2">
+            {isConfigured && user && (
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <div className="h-7 w-7 rounded-lg bg-primary/15 border border-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">
+                  {user.email?.[0]?.toUpperCase() || "U"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-semibold text-sidebar-foreground truncate">{user.email}</p>
+                  <p className="text-[8px] text-sidebar-foreground/40 uppercase">{role}</p>
+                </div>
+              </div>
+            )}
             <div className="flex gap-2">
               <button
                 onClick={toggleTheme}
@@ -106,6 +128,12 @@ export function AppLayout() {
                 {langLabels[lang]}
               </button>
             </div>
+            {isConfigured && user && (
+              <button onClick={signOut}
+                className="w-full h-9 glass rounded-xl flex items-center justify-center gap-1.5 text-xs font-medium text-destructive/70 hover:text-destructive transition-colors">
+                <LogOut className="h-3.5 w-3.5" /> Sign Out
+              </button>
+            )}
           </div>
         </div>
       </aside>
