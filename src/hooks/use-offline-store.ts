@@ -1,11 +1,11 @@
 import { useCallback } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, queueSync } from "@/lib/offline-db";
-import type { Product, Customer, Sale, Payment, JobCard, Favorite } from "@/lib/offline-db";
+import type { Product, Customer, Sale, Payment, JobCard, Favorite, Supplier, StoreProfile } from "@/lib/offline-db";
 import type { Table } from "dexie";
 
 // Re-export types for backward compatibility
-export type { Product, Customer, Sale, Payment, JobCard, JobStatus, CartItem, Favorite } from "@/lib/offline-db";
+export type { Product, Customer, Sale, Payment, JobCard, JobStatus, CartItem, Favorite, Supplier, StoreProfile } from "@/lib/offline-db";
 
 // ── Specialized hooks (drop-in replacements for use-local-store) ──
 
@@ -103,4 +103,30 @@ export function useFavorites() {
     await db.favorites.delete(id);
   }, []);
   return { items, add, remove };
+}
+
+export function useSuppliers() {
+  const items = useLiveQuery(() => db.suppliers.toArray(), [], []) as Supplier[];
+  const add = useCallback(async (item: Supplier) => {
+    await db.suppliers.put(item);
+    await queueSync("suppliers", "add", item.id, item);
+  }, []);
+  const update = useCallback(async (id: string, patch: Partial<Supplier>) => {
+    await db.suppliers.update(id, patch);
+    await queueSync("suppliers", "update", id, patch);
+  }, []);
+  const remove = useCallback(async (id: string) => {
+    await db.suppliers.delete(id);
+    await queueSync("suppliers", "delete", id, { id });
+  }, []);
+  return { items, add, update, remove };
+}
+
+export function useStoreProfile() {
+  const items = useLiveQuery(() => db.storeProfile.toArray(), [], []) as StoreProfile[];
+  const profile = items[0] ?? null;
+  const save = useCallback(async (data: StoreProfile) => {
+    await db.storeProfile.put(data);
+  }, []);
+  return { profile, save };
 }

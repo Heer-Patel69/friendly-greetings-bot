@@ -10,8 +10,39 @@ export interface Product {
   category: string;
   stock: number;
   description?: string;
-  images?: string[];
+  barcode?: string;
+  images: string[];
+  coverImage?: string;
+  cost?: number;
+  gst?: number;
+  reorderLevel?: number;
+  supplierId?: string;
+  visibility?: "online" | "offline" | "both";
+  /** @deprecated use visibility instead */
   storeVisible?: boolean;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  company?: string;
+  notes?: string;
+}
+
+export interface StoreProfile {
+  id: string;
+  name: string;
+  slug: string;
+  logo?: string;
+  description?: string;
+  address?: string;
+  city?: string;
+  categories?: string[];
+  isOpen?: boolean;
+  phone?: string;
+  whatsapp?: string;
 }
 
 export interface Customer {
@@ -109,6 +140,8 @@ class DukaanDB extends Dexie {
   jobCards!: Table<JobCard, string>;
   syncQueue!: Table<SyncQueueItem, number>;
   favorites!: Table<Favorite, string>;
+  suppliers!: Table<Supplier, string>;
+  storeProfile!: Table<StoreProfile, string>;
 
   constructor() {
     super("dukaanos");
@@ -137,6 +170,29 @@ class DukaanDB extends Dexie {
         c.address = c.address ?? "";
       });
     });
+
+    this.version(3).stores({
+      products: "id, sku, category, name, barcode, supplierId",
+      customers: "id, phone, name",
+      sales: "id, customer, status, timestamp",
+      payments: "id, saleId, timestamp, customer",
+      jobCards: "id, status, createdAt, customerPhone",
+      syncQueue: "++id, table, synced, createdAt",
+      favorites: "id, productId, position",
+      suppliers: "id, name, phone",
+      storeProfile: "id",
+    }).upgrade(tx => {
+      return tx.table("products").toCollection().modify(p => {
+        p.images = p.images ?? [];
+        p.coverImage = p.coverImage ?? "";
+        p.cost = p.cost ?? 0;
+        p.gst = p.gst ?? 18;
+        p.reorderLevel = p.reorderLevel ?? 5;
+        p.supplierId = p.supplierId ?? "";
+        p.barcode = p.barcode ?? "";
+        p.visibility = p.storeVisible === false ? "offline" : "both";
+      });
+    });
   }
 }
 
@@ -145,16 +201,16 @@ export const db = new DukaanDB();
 // ── Seed data (first run only) ──
 
 const DEFAULT_PRODUCTS: Product[] = [
-  { id: "1", name: "RO Service", sku: "RO-501", price: 1500, category: "RO", stock: 99 },
-  { id: "2", name: "RO Filter 5-Stage", sku: "RO-502", price: 850, category: "RO", stock: 2 },
-  { id: "3", name: "Washing Machine Repair", sku: "WM-201", price: 2800, category: "Washing Machine", stock: 99 },
-  { id: "4", name: "WM Belt Replacement", sku: "WM-202", price: 650, category: "Washing Machine", stock: 24 },
-  { id: "5", name: "Geyser Installation", sku: "GY-101", price: 4500, category: "Geyser", stock: 99 },
-  { id: "6", name: "Geyser Heating Rod 2KW", sku: "GY-102", price: 1200, category: "Geyser", stock: 1 },
-  { id: "7", name: "AC Gas Refill R32", sku: "AC-301", price: 2500, category: "AC", stock: 3 },
-  { id: "8", name: "AC Full Service", sku: "AC-302", price: 1800, category: "AC", stock: 99 },
-  { id: "9", name: "Chimney Deep Clean", sku: "CH-401", price: 1500, category: "Chimney", stock: 99 },
-  { id: "10", name: "Chimney Filter Mesh", sku: "CH-402", price: 450, category: "Chimney", stock: 18 },
+  { id: "1", name: "RO Service", sku: "RO-501", price: 1500, category: "RO", stock: 99, images: [], gst: 18, reorderLevel: 5, visibility: "both" },
+  { id: "2", name: "RO Filter 5-Stage", sku: "RO-502", price: 850, category: "RO", stock: 2, images: [], gst: 18, reorderLevel: 5, visibility: "both" },
+  { id: "3", name: "Washing Machine Repair", sku: "WM-201", price: 2800, category: "Washing Machine", stock: 99, images: [], gst: 18, reorderLevel: 5, visibility: "both" },
+  { id: "4", name: "WM Belt Replacement", sku: "WM-202", price: 650, category: "Washing Machine", stock: 24, images: [], gst: 18, reorderLevel: 5, visibility: "both" },
+  { id: "5", name: "Geyser Installation", sku: "GY-101", price: 4500, category: "Geyser", stock: 99, images: [], gst: 18, reorderLevel: 5, visibility: "both" },
+  { id: "6", name: "Geyser Heating Rod 2KW", sku: "GY-102", price: 1200, category: "Geyser", stock: 1, images: [], gst: 18, reorderLevel: 5, visibility: "both" },
+  { id: "7", name: "AC Gas Refill R32", sku: "AC-301", price: 2500, category: "AC", stock: 3, images: [], gst: 18, reorderLevel: 5, visibility: "both" },
+  { id: "8", name: "AC Full Service", sku: "AC-302", price: 1800, category: "AC", stock: 99, images: [], gst: 18, reorderLevel: 5, visibility: "both" },
+  { id: "9", name: "Chimney Deep Clean", sku: "CH-401", price: 1500, category: "Chimney", stock: 99, images: [], gst: 18, reorderLevel: 5, visibility: "both" },
+  { id: "10", name: "Chimney Filter Mesh", sku: "CH-402", price: 450, category: "Chimney", stock: 18, images: [], gst: 18, reorderLevel: 5, visibility: "both" },
 ];
 
 const DEFAULT_CUSTOMERS: Customer[] = [

@@ -19,6 +19,7 @@ import More from "./pages/More";
 import NotFound from "./pages/NotFound";
 import Stores from "./pages/Stores";
 import JobCards from "./pages/JobCards";
+import PublicStore from "./pages/PublicStore";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
           {/* Marketing website — standalone */}
           <Route path="/" element={<Index />} />
           <Route path="/stores" element={<Stores />} />
+          <Route path="/store/:slug" element={<PublicStore />} />
           <Route path="/pos" element={<POS />} />
           {/* Business app — with sidebar/bottom nav */}
           <Route element={<AppLayout />}>
