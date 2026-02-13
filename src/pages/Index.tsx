@@ -23,6 +23,11 @@ import {
   MapPin,
 } from "lucide-react";
 import umiyaLogo from "@/assets/umiya-logo.png";
+import heroBg from "@/assets/hero-bg.jpg";
+import serviceWashing from "@/assets/service-washing-machine.jpg";
+import serviceRO from "@/assets/service-ro-system.jpg";
+import serviceGeyser from "@/assets/service-geyser.jpg";
+import serviceAC from "@/assets/service-ac-chimney.jpg";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 28 },
@@ -43,11 +48,16 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
       {/* ── HERO ── */}
-      <section className="relative gradient-hero overflow-hidden min-h-[90vh] md:min-h-screen flex flex-col">
+      <section className="relative overflow-hidden min-h-[90vh] md:min-h-screen flex flex-col">
+        {/* Hero background image */}
+        <div className="absolute inset-0">
+          <img src={heroBg} alt="" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
+          <div className="absolute inset-0 gradient-hero opacity-90" />
+        </div>
         {/* Glow orbs */}
         <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-[radial-gradient(circle,hsl(225_80%_50%/0.15),transparent_70%)] blur-3xl" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[radial-gradient(circle,hsl(24_100%_55%/0.08),transparent_70%)] blur-3xl" />
-        <div className="absolute top-[40%] right-[20%] w-[30%] h-[30%] rounded-full bg-[radial-gradient(circle,hsl(225_80%_60%/0.1),transparent_70%)] blur-2xl" />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-16 md:pt-10 md:pb-24 flex-1 flex flex-col">
           {/* Nav */}
@@ -234,10 +244,10 @@ export default function Index() {
           className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6"
         >
           {[
-            { icon: Wrench, title: "Washing Machines", desc: "Installation, repair & deep-cleaning for all brands", gradient: "from-primary/20 to-primary/5" },
-            { icon: Droplets, title: "RO Systems", desc: "Water purifier setup, filter replacement, AMC", gradient: "from-brand-info/20 to-brand-info/5" },
-            { icon: Flame, title: "Geysers", desc: "Gas & electric geyser repairs and installations", gradient: "from-accent/20 to-accent/5" },
-            { icon: Wind, title: "AC & Chimney", desc: "Professional deep-cleaning, gas refill, service", gradient: "from-brand-success/20 to-brand-success/5" },
+            { icon: Wrench, title: "Washing Machines", desc: "Installation, repair & deep-cleaning for all brands", gradient: "from-primary/20 to-primary/5", image: serviceWashing },
+            { icon: Droplets, title: "RO Systems", desc: "Water purifier setup, filter replacement, AMC", gradient: "from-brand-info/20 to-brand-info/5", image: serviceRO },
+            { icon: Flame, title: "Geysers", desc: "Gas & electric geyser repairs and installations", gradient: "from-accent/20 to-accent/5", image: serviceGeyser },
+            { icon: Wind, title: "AC & Chimney", desc: "Professional deep-cleaning, gas refill, service", gradient: "from-brand-success/20 to-brand-success/5", image: serviceAC },
           ].map((s, i) => (
             <motion.div
               key={s.title}
@@ -247,10 +257,15 @@ export default function Index() {
             >
               <div className={`absolute inset-0 bg-gradient-to-br ${s.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
               <div className="relative">
-                <div className="h-12 w-12 md:h-14 md:w-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-5 group-hover:glow-primary transition-all duration-500">
-                  <s.icon className="h-6 w-6 md:h-7 md:w-7 text-primary" />
+                <div className="h-32 md:h-40 rounded-xl overflow-hidden mb-5 border border-border/20">
+                  <img src={s.image} alt={s.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                 </div>
-                <h3 className="font-brand text-base md:text-lg text-foreground mb-2 tracking-wide">{s.title}</h3>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="h-9 w-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:glow-primary transition-all duration-500">
+                    <s.icon className="h-4 w-4 text-primary" />
+                  </div>
+                  <h3 className="font-brand text-base md:text-lg text-foreground tracking-wide">{s.title}</h3>
+                </div>
                 <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
               </div>
             </motion.div>
