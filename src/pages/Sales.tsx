@@ -60,8 +60,13 @@ export default function Sales() {
               </div>
               <div className="text-right">
                 <p className="text-sm font-bold text-foreground">₹{sale.amount.toLocaleString("en-IN")}</p>
+                {sale.status !== "Paid" && sale.paidAmount > 0 && (
+                  <p className="text-[9px] text-muted-foreground">Paid: ₹{sale.paidAmount.toLocaleString("en-IN")}</p>
+                )}
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                  sale.status === "Paid" ? "bg-brand-success/10 text-brand-success border-brand-success/20" : "bg-brand-warning/10 text-brand-warning border-brand-warning/20"
+                  sale.status === "Paid" ? "bg-brand-success/10 text-brand-success border-brand-success/20" :
+                  sale.status === "Partial" ? "bg-brand-warning/10 text-brand-warning border-brand-warning/20" :
+                  "bg-destructive/10 text-destructive border-destructive/20"
                 }`}>{sale.status}</span>
               </div>
             </div>
