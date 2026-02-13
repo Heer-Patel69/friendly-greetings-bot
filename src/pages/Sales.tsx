@@ -12,43 +12,39 @@ export default function Sales() {
   return (
     <PageShell title="Sales & Billing" subtitle="तेज़ बिल बनाएं">
       <div className="space-y-4">
-        {/* Quick Sell CTA */}
         <motion.button
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="w-full bg-accent text-accent-foreground font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg shadow-accent/20"
+          className="w-full gradient-accent text-accent-foreground font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform glow-accent"
         >
           <Zap className="h-5 w-5" /> Quick Sell • तेज़ बिल बनाएं
         </motion.button>
 
-        {/* Today Stats */}
         <div className="grid grid-cols-3 gap-3">
           {[
             { label: "Today Sales", value: "₹12,450", icon: ShoppingCart },
             { label: "Invoices", value: "8", icon: FileText },
             { label: "Avg Sale", value: "₹1,556", icon: IndianRupee },
           ].map((s) => (
-            <div key={s.label} className="bg-card rounded-2xl border border-border p-3 text-center shadow-brand">
+            <div key={s.label} className="glass rounded-2xl p-3 text-center">
               <s.icon className="h-4 w-4 text-primary mx-auto mb-1.5" />
               <p className="text-lg font-bold text-foreground">{s.value}</p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{s.label}</p>
+              <p className="text-[9px] text-muted-foreground uppercase tracking-wider">{s.label}</p>
             </div>
           ))}
         </div>
 
-        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input className="w-full h-12 pl-10 pr-4 rounded-2xl bg-card border border-border text-sm shadow-brand focus:ring-2 focus:ring-primary/20 outline-none transition-shadow" placeholder="Search invoices..." />
+          <input className="w-full h-12 pl-10 pr-4 rounded-2xl glass text-sm text-foreground placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-primary/30 outline-none transition-shadow" placeholder="Search invoices..." />
         </div>
 
-        {/* Recent Sales */}
         <div className="space-y-2">
-          <h4 className="text-sm font-bold text-foreground px-1">Recent Invoices</h4>
+          <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-[0.15em] px-1">Recent Invoices</h4>
           {recentSales.map((sale) => (
-            <div key={sale.id} className="bg-card rounded-2xl border border-border p-4 flex items-center justify-between shadow-brand hover:shadow-elevated transition-shadow">
+            <div key={sale.id} className="glass rounded-2xl p-4 flex items-center justify-between hover:bg-card/70 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                <div className="h-10 w-10 rounded-xl gradient-card border border-primary/20 flex items-center justify-center text-primary font-bold text-sm">
                   {sale.customer[0]}
                 </div>
                 <div>
@@ -58,8 +54,8 @@ export default function Sales() {
               </div>
               <div className="text-right">
                 <p className="text-sm font-bold text-foreground">{sale.amount}</p>
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                  sale.status === "Paid" ? "bg-brand-success/10 text-brand-success" : "bg-brand-warning/10 text-brand-warning"
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  sale.status === "Paid" ? "bg-brand-success/10 text-brand-success border-brand-success/20" : "bg-brand-warning/10 text-brand-warning border-brand-warning/20"
                 }`}>{sale.status}</span>
               </div>
             </div>

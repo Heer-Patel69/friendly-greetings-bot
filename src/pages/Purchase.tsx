@@ -1,5 +1,5 @@
 import { PageShell } from "@/components/layout/PageShell";
-import { Truck, Plus, Package, Clock, CheckCircle2 } from "lucide-react";
+import { Plus, CheckCircle2 } from "lucide-react";
 
 const orders = [
   { id: "PO-001", supplier: "Gujarat Electronics Dist.", items: 5, total: "₹18,500", status: "Received", date: "12 Feb" },
@@ -11,25 +11,25 @@ export default function Purchase() {
   return (
     <PageShell title="Purchases" subtitle="Supplier Management">
       <div className="space-y-4">
-        <button className="w-full bg-primary text-primary-foreground font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg shadow-primary/20">
+        <button className="w-full gradient-primary text-primary-foreground font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform glow-primary">
           <Plus className="h-5 w-5" /> New Purchase Order
         </button>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-card rounded-2xl border border-border p-3 text-center shadow-brand">
+          <div className="glass rounded-2xl p-3 text-center">
             <p className="text-lg font-bold text-foreground">₹38,500</p>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">This Month</p>
+            <p className="text-[9px] text-muted-foreground uppercase tracking-wider">This Month</p>
           </div>
-          <div className="bg-card rounded-2xl border border-border p-3 text-center shadow-brand">
+          <div className="glass rounded-2xl p-3 text-center">
             <p className="text-lg font-bold text-brand-warning">1</p>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Pending POs</p>
+            <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Pending POs</p>
           </div>
         </div>
 
         <div className="space-y-2">
-          <h4 className="text-sm font-bold text-foreground px-1">Recent Orders</h4>
+          <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-[0.15em] px-1">Recent Orders</h4>
           {orders.map((o) => (
-            <div key={o.id} className="bg-card rounded-2xl border border-border p-4 shadow-brand hover:shadow-elevated transition-shadow">
+            <div key={o.id} className="glass rounded-2xl p-4 hover:bg-card/70 transition-colors">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold text-foreground">{o.supplier}</p>
@@ -37,8 +37,8 @@ export default function Purchase() {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold text-foreground">{o.total}</p>
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                    o.status === "Received" ? "bg-brand-success/10 text-brand-success" : "bg-brand-warning/10 text-brand-warning"
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    o.status === "Received" ? "bg-brand-success/10 text-brand-success border-brand-success/20" : "bg-brand-warning/10 text-brand-warning border-brand-warning/20"
                   }`}>{o.status}</span>
                 </div>
               </div>
