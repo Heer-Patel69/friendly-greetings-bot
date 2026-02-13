@@ -45,6 +45,11 @@ export interface Sale {
   status: "Paid" | "Partial" | "Pending";
   date: string;
   timestamp: number;
+  // Razorpay-ready fields
+  paymentLink?: string;
+  paymentLinkId?: string;
+  razorpayPaymentId?: string;
+  qrRef?: string;
 }
 
 export interface Payment {

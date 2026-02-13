@@ -94,6 +94,8 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
 
   const invoiceId = useMemo(() => `INV-${Date.now().toString(36).toUpperCase().slice(-6)}`, [billDone]);
 
+  const paymentLinkUrl = remaining > 0 ? `https://rzp.io/i/${invoiceId.slice(-8)}` : undefined;
+
   const getInvoiceData = () => ({
     invoiceId,
     date: new Date().toLocaleDateString("en-IN"),
@@ -106,6 +108,7 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
     total,
     paidAmount,
     status: paymentStatus,
+    paymentLink: paymentLinkUrl,
   });
 
   const generateWhatsAppMsg = () => {
@@ -114,6 +117,9 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
 
     if (remaining > 0) {
       msg += `\n\n💰 Paid: ₹${paidAmount.toLocaleString("en-IN")}\n⚠️ *Balance Due: ₹${remaining.toLocaleString("en-IN")}*`;
+      if (paymentLinkUrl) {
+        msg += `\n\n💳 *Pay Online:*\n${paymentLinkUrl}`;
+      }
       msg += `\n\nPlease clear the dues at your earliest convenience. 🙏`;
     } else {
       msg += `\n\n✅ *Payment: FULLY PAID*`;
@@ -131,8 +137,8 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
     window.open(url, "_blank");
   };
 
-  const handleDownloadPDF = () => {
-    downloadInvoicePDF(getInvoiceData());
+  const handleDownloadPDF = async () => {
+    await downloadInvoicePDF(getInvoiceData());
   };
 
   const handleDone = () => {
@@ -147,6 +153,9 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
       status: paymentStatus,
       date: "Just now",
       timestamp: Date.now(),
+      paymentLink: paymentLinkUrl,
+      paymentLinkId: remaining > 0 ? `plink_${invoiceId.slice(-8)}` : undefined,
+      qrRef: remaining > 0 ? paymentLinkUrl : undefined,
     });
 
     // Record payment if any
@@ -577,7 +586,7 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
                   </motion.button>
                   <motion.button
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => { handleDownloadPDF(); shareWhatsApp(); }}
+                    onClick={async () => { await handleDownloadPDF(); shareWhatsApp(); }}
                     className="h-12 rounded-xl glass text-foreground font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-card/80 transition-all border border-accent/20"
                   >
                     <FileText className="h-4 w-4 text-accent" /> Both
