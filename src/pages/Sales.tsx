@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { PageShell } from "@/components/layout/PageShell";
-import { ShoppingCart, Plus, FileText, Zap, Search, Clock, IndianRupee } from "lucide-react";
-import { motion } from "framer-motion";
+import { ShoppingCart, FileText, Zap, Search, IndianRupee } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import QuickBillModal from "@/components/billing/QuickBillModal";
 
 const recentSales = [
   { id: "INV-001", customer: "Rajesh Patel", items: "RO Service", amount: "₹1,500", time: "2h ago", status: "Paid" },
@@ -9,12 +11,15 @@ const recentSales = [
 ];
 
 export default function Sales() {
+  const [billOpen, setBillOpen] = useState(false);
+
   return (
     <PageShell title="Sales & Billing" subtitle="तेज़ बिल बनाएं">
       <div className="space-y-4">
         <motion.button
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
+          onClick={() => setBillOpen(true)}
           className="w-full gradient-accent text-accent-foreground font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform glow-accent"
         >
           <Zap className="h-5 w-5" /> Quick Sell • तेज़ बिल बनाएं
@@ -62,6 +67,10 @@ export default function Sales() {
           ))}
         </div>
       </div>
+
+      <AnimatePresence>
+        {billOpen && <QuickBillModal open={billOpen} onClose={() => setBillOpen(false)} />}
+      </AnimatePresence>
     </PageShell>
   );
 }
