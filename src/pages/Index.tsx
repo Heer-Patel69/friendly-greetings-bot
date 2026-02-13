@@ -20,8 +20,8 @@ import {
   MessageCircle,
   ChevronRight,
   Sparkles,
-  MapPin,
-} from "lucide-react";
+  MapPin } from
+"lucide-react";
 import umiyaLogo from "@/assets/umiya-logo.png";
 import heroBg from "@/assets/hero-bg.jpg";
 import serviceWashing from "@/assets/service-washing-machine.jpg";
@@ -34,12 +34,12 @@ const fadeUp = {
   visible: (i: number) => ({
     opacity: 1,
     y: 0,
-    transition: { delay: i * 0.1, duration: 0.6, ease: [0.22, 1, 0.36, 1] as const },
-  }),
+    transition: { delay: i * 0.1, duration: 0.6, ease: [0.22, 1, 0.36, 1] as const }
+  })
 };
 
 const stagger = {
-  visible: { transition: { staggerChildren: 0.08 } },
+  visible: { transition: { staggerChildren: 0.08 } }
 };
 
 export default function Index() {
@@ -65,8 +65,8 @@ export default function Index() {
             initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="flex items-center justify-between mb-16 md:mb-24"
-          >
+            className="flex items-center justify-between mb-16 md:mb-24">
+
             <div className="flex items-center gap-3">
               {/* Logo with glow */}
               <div className="relative">
@@ -74,8 +74,8 @@ export default function Index() {
                 <img src={umiyaLogo} alt="Shree Umiya Electronics" className="relative h-12 w-12 rounded-2xl ring-1 ring-white/10" />
               </div>
               <div>
-                <span className="text-foreground font-brand text-lg tracking-[0.08em]">SHREE UMIYA</span>
-                <p className="text-muted-foreground text-[9px] uppercase tracking-[0.25em]">Electronics • Est. 2005</p>
+                <span className="text-foreground font-brand text-lg tracking-[0.08em]">SHREE UMIYA ELECTROICS </span>
+                <p className="text-muted-foreground text-[9px] uppercase tracking-[0.25em]"> Est. 2005</p>
               </div>
             </div>
             <div className="hidden lg:flex items-center gap-8">
@@ -84,15 +84,15 @@ export default function Index() {
               <a href="#platform" className="text-muted-foreground hover:text-foreground text-sm transition-colors duration-300">Platform</a>
               <button
                 onClick={() => navigate("/dashboard")}
-                className="gradient-accent text-accent-foreground px-6 py-2.5 rounded-xl text-sm font-bold hover:brightness-110 active:scale-[0.97] transition-all glow-accent"
-              >
+                className="gradient-accent text-accent-foreground px-6 py-2.5 rounded-xl text-sm font-bold hover:brightness-110 active:scale-[0.97] transition-all glow-accent">
+
                 Open Dashboard
               </button>
             </div>
             <button
               onClick={() => navigate("/dashboard")}
-              className="lg:hidden gradient-accent text-accent-foreground px-4 py-2 rounded-xl text-sm font-bold glow-accent"
-            >
+              className="lg:hidden gradient-accent text-accent-foreground px-4 py-2 rounded-xl text-sm font-bold glow-accent">
+
               Dashboard →
             </button>
           </motion.nav>
@@ -104,8 +104,8 @@ export default function Index() {
                 initial="hidden"
                 animate="visible"
                 variants={stagger}
-                className="text-center md:text-left"
-              >
+                className="text-center md:text-left">
+
                 <motion.div variants={fadeUp} custom={0} className="inline-flex items-center gap-2 glass rounded-full px-4 py-2 mb-8">
                   <Sparkles className="h-3.5 w-3.5 text-accent" />
                   <span className="text-xs font-semibold text-foreground/80 tracking-wide">20,000+ Problems Solved • Since 2005</span>
@@ -131,15 +131,15 @@ export default function Index() {
                 <motion.div variants={fadeUp} custom={3} className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
                   <button
                     onClick={() => navigate("/dashboard")}
-                    className="gradient-accent text-accent-foreground font-bold py-4 px-8 rounded-2xl flex items-center justify-center gap-2.5 hover:brightness-110 active:scale-[0.97] transition-all glow-accent text-base"
-                  >
+                    className="gradient-accent text-accent-foreground font-bold py-4 px-8 rounded-2xl flex items-center justify-center gap-2.5 hover:brightness-110 active:scale-[0.97] transition-all glow-accent text-base">
+
                     <Zap className="h-5 w-5" />
                     Manage My Business
                   </button>
                   <a
                     href="tel:+919999999999"
-                    className="glass text-foreground font-semibold py-4 px-8 rounded-2xl flex items-center justify-center gap-2.5 hover:bg-card/80 transition-all"
-                  >
+                    className="glass text-foreground font-semibold py-4 px-8 rounded-2xl flex items-center justify-center gap-2.5 hover:bg-card/80 transition-all">
+
                     <Phone className="h-4 w-4 text-brand-success" />
                     Book Service
                   </a>
@@ -155,31 +155,31 @@ export default function Index() {
                 initial={{ opacity: 0, scale: 0.92, y: 40 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: 0.4, ease: [0.22, 1, 0.36, 1] as const }}
-                className="hidden md:block"
-              >
+                className="hidden md:block">
+
                 <div className="relative">
                   <div className="absolute inset-0 rounded-3xl bg-primary/10 blur-3xl scale-105" />
                   <div className="relative glass-strong rounded-3xl p-8">
                     <p className="text-xs text-muted-foreground uppercase tracking-[0.2em] mb-6 font-medium">Why Gandhinagar Trusts Us</p>
                     <div className="grid grid-cols-2 gap-4">
                       {[
-                        { value: "20+", label: "Years Experience", icon: Clock, glow: "glow-primary" },
-                        { value: "20K+", label: "Problems Solved", icon: CheckCircle2, glow: "" },
-                        { value: "4.8★", label: "Customer Rating", icon: Star, glow: "" },
-                        { value: "<2hr", label: "Response Time", icon: Zap, glow: "glow-accent" },
-                      ].map((s, i) => (
-                        <motion.div
-                          key={s.label}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.6 + i * 0.1 }}
-                          className={`gradient-card rounded-2xl p-5 text-center border border-border/30 hover:border-primary/30 transition-all duration-300 ${s.glow}`}
-                        >
+                      { value: "20+", label: "Years Experience", icon: Clock, glow: "glow-primary" },
+                      { value: "20K+", label: "Problems Solved", icon: CheckCircle2, glow: "" },
+                      { value: "4.8★", label: "Customer Rating", icon: Star, glow: "" },
+                      { value: "<2hr", label: "Response Time", icon: Zap, glow: "glow-accent" }].
+                      map((s, i) =>
+                      <motion.div
+                        key={s.label}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.6 + i * 0.1 }}
+                        className={`gradient-card rounded-2xl p-5 text-center border border-border/30 hover:border-primary/30 transition-all duration-300 ${s.glow}`}>
+
                           <s.icon className="h-5 w-5 text-accent mx-auto mb-3" />
                           <p className="text-3xl font-brand text-foreground tracking-wide">{s.value}</p>
                           <p className="text-[10px] text-muted-foreground mt-1.5 uppercase tracking-wider">{s.label}</p>
                         </motion.div>
-                      ))}
+                      )}
                     </div>
                   </div>
                 </div>
@@ -192,18 +192,18 @@ export default function Index() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
-            className="md:hidden grid grid-cols-3 gap-3 mt-8"
-          >
+            className="md:hidden grid grid-cols-3 gap-3 mt-8">
+
             {[
-              { value: "20+", label: "Years" },
-              { value: "20K+", label: "Solved" },
-              { value: "4.8★", label: "Rating" },
-            ].map((s) => (
-              <div key={s.label} className="glass rounded-2xl py-4 text-center">
+            { value: "20+", label: "Years" },
+            { value: "20K+", label: "Solved" },
+            { value: "4.8★", label: "Rating" }].
+            map((s) =>
+            <div key={s.label} className="glass rounded-2xl py-4 text-center">
                 <p className="text-xl font-brand text-foreground tracking-wide">{s.value}</p>
                 <p className="text-[9px] text-muted-foreground uppercase tracking-[0.15em] mt-0.5">{s.label}</p>
               </div>
-            ))}
+            )}
           </motion.div>
         </div>
 
@@ -229,8 +229,8 @@ export default function Index() {
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
           variants={stagger}
-          className="text-center mb-14"
-        >
+          className="text-center mb-14">
+
           <motion.p variants={fadeUp} custom={0} className="text-accent font-bold text-xs uppercase tracking-[0.3em] mb-3">Our Expertise</motion.p>
           <motion.h2 variants={fadeUp} custom={1} className="font-brand text-4xl md:text-6xl text-foreground tracking-[0.03em]">WHAT WE MASTER</motion.h2>
           <motion.p variants={fadeUp} custom={2} className="text-muted-foreground mt-4 max-w-md mx-auto leading-relaxed">We don't do everything — we specialize in what we truly know best.</motion.p>
@@ -241,20 +241,20 @@ export default function Index() {
           whileInView="visible"
           viewport={{ once: true, margin: "-40px" }}
           variants={stagger}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6"
-        >
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+
           {[
-            { icon: Wrench, title: "Washing Machines", desc: "Installation, repair & deep-cleaning for all brands", gradient: "from-primary/20 to-primary/5", image: serviceWashing },
-            { icon: Droplets, title: "RO Systems", desc: "Water purifier setup, filter replacement, AMC", gradient: "from-brand-info/20 to-brand-info/5", image: serviceRO },
-            { icon: Flame, title: "Geysers", desc: "Gas & electric geyser repairs and installations", gradient: "from-accent/20 to-accent/5", image: serviceGeyser },
-            { icon: Wind, title: "AC & Chimney", desc: "Professional deep-cleaning, gas refill, service", gradient: "from-brand-success/20 to-brand-success/5", image: serviceAC },
-          ].map((s, i) => (
-            <motion.div
-              key={s.title}
-              variants={fadeUp}
-              custom={i}
-              className="glass rounded-2xl p-6 md:p-8 hover:shadow-elevated hover:-translate-y-2 transition-all duration-500 group relative overflow-hidden"
-            >
+          { icon: Wrench, title: "Washing Machines", desc: "Installation, repair & deep-cleaning for all brands", gradient: "from-primary/20 to-primary/5", image: serviceWashing },
+          { icon: Droplets, title: "RO Systems", desc: "Water purifier setup, filter replacement, AMC", gradient: "from-brand-info/20 to-brand-info/5", image: serviceRO },
+          { icon: Flame, title: "Geysers", desc: "Gas & electric geyser repairs and installations", gradient: "from-accent/20 to-accent/5", image: serviceGeyser },
+          { icon: Wind, title: "AC & Chimney", desc: "Professional deep-cleaning, gas refill, service", gradient: "from-brand-success/20 to-brand-success/5", image: serviceAC }].
+          map((s, i) =>
+          <motion.div
+            key={s.title}
+            variants={fadeUp}
+            custom={i}
+            className="glass rounded-2xl p-6 md:p-8 hover:shadow-elevated hover:-translate-y-2 transition-all duration-500 group relative overflow-hidden">
+
               <div className={`absolute inset-0 bg-gradient-to-br ${s.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
               <div className="relative">
                 <div className="h-32 md:h-40 rounded-xl overflow-hidden mb-5 border border-border/20">
@@ -269,15 +269,15 @@ export default function Index() {
                 <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
               </div>
             </motion.div>
-          ))}
+          )}
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="mt-8 text-center"
-        >
+          className="mt-8 text-center">
+
           <span className="inline-flex items-center gap-2 glass rounded-full px-5 py-2 text-xs text-muted-foreground/60">
             <Shield className="h-3 w-3 text-accent/50" />
             No Refrigerators — We Specialize to Master
@@ -294,8 +294,8 @@ export default function Index() {
             whileInView="visible"
             viewport={{ once: true, margin: "-100px" }}
             variants={stagger}
-            className="text-center mb-14"
-          >
+            className="text-center mb-14">
+
             <motion.p variants={fadeUp} custom={0} className="text-accent font-bold text-xs uppercase tracking-[0.3em] mb-3">Why Us</motion.p>
             <motion.h2 variants={fadeUp} custom={1} className="font-brand text-4xl md:text-6xl text-foreground tracking-[0.03em]">BUILT ON TRUST</motion.h2>
             <motion.p variants={fadeUp} custom={2} className="text-muted-foreground mt-4 max-w-md mx-auto leading-relaxed">Since 2005, families across Gandhinagar have trusted us for honest, expert service.</motion.p>
@@ -306,19 +306,19 @@ export default function Index() {
             whileInView="visible"
             viewport={{ once: true }}
             variants={stagger}
-            className="grid md:grid-cols-3 gap-6"
-          >
+            className="grid md:grid-cols-3 gap-6">
+
             {[
-              { icon: Shield, title: "Transparent Pricing", desc: "No hidden charges. Upfront estimate before every job.", hindi: "कोई छिपा शुल्क नहीं", glow: "hover:glow-primary" },
-              { icon: Award, title: "Certified Technicians", desc: "Factory-trained, experienced professionals only.", hindi: "प्रशिक्षित तकनीशियन", glow: "hover:glow-accent" },
-              { icon: Clock, title: "Same-Day Response", desc: "Most service calls attended within 2 hours in Sargasan.", hindi: "उसी दिन सेवा", glow: "hover:glow-primary" },
-            ].map((item, i) => (
-              <motion.div
-                key={item.title}
-                variants={fadeUp}
-                custom={i}
-                className={`glass rounded-2xl p-7 md:p-9 text-center md:text-left hover:-translate-y-1 transition-all duration-500 ${item.glow}`}
-              >
+            { icon: Shield, title: "Transparent Pricing", desc: "No hidden charges. Upfront estimate before every job.", hindi: "कोई छिपा शुल्क नहीं", glow: "hover:glow-primary" },
+            { icon: Award, title: "Certified Technicians", desc: "Factory-trained, experienced professionals only.", hindi: "प्रशिक्षित तकनीशियन", glow: "hover:glow-accent" },
+            { icon: Clock, title: "Same-Day Response", desc: "Most service calls attended within 2 hours in Sargasan.", hindi: "उसी दिन सेवा", glow: "hover:glow-primary" }].
+            map((item, i) =>
+            <motion.div
+              key={item.title}
+              variants={fadeUp}
+              custom={i}
+              className={`glass rounded-2xl p-7 md:p-9 text-center md:text-left hover:-translate-y-1 transition-all duration-500 ${item.glow}`}>
+
                 <div className="h-14 w-14 rounded-2xl gradient-card border border-primary/20 flex items-center justify-center mx-auto md:mx-0 mb-6">
                   <item.icon className="h-7 w-7 text-primary" />
                 </div>
@@ -326,7 +326,7 @@ export default function Index() {
                 <p className="text-sm text-muted-foreground leading-relaxed mb-3">{item.desc}</p>
                 <p className="text-xs text-accent/50 font-medium">{item.hindi}</p>
               </motion.div>
-            ))}
+            )}
           </motion.div>
         </div>
       </section>
@@ -338,8 +338,8 @@ export default function Index() {
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
           variants={stagger}
-          className="text-center mb-14"
-        >
+          className="text-center mb-14">
+
           <motion.p variants={fadeUp} custom={0} className="text-accent font-bold text-xs uppercase tracking-[0.3em] mb-3">Business Platform</motion.p>
           <motion.h2 variants={fadeUp} custom={1} className="font-brand text-4xl md:text-6xl text-foreground tracking-[0.03em]">YOUR DIGITAL ENGINE</motion.h2>
           <motion.p variants={fadeUp} custom={2} className="text-muted-foreground mt-4 max-w-lg mx-auto leading-relaxed">
@@ -352,41 +352,41 @@ export default function Index() {
           whileInView="visible"
           viewport={{ once: true }}
           variants={stagger}
-          className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6"
-        >
+          className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+
           {[
-            { icon: Receipt, title: "Fast Billing", desc: "3-tap invoicing with GST", accent: "text-accent" },
-            { icon: Package, title: "Inventory", desc: "Real-time stock tracking", accent: "text-primary" },
-            { icon: BarChart3, title: "Reports", desc: "P&L, Cash Flow, Analytics", accent: "text-brand-info" },
-            { icon: Users, title: "Customer CRM", desc: "History, reminders, AMC", accent: "text-brand-success" },
-            { icon: MessageCircle, title: "WhatsApp", desc: "Share invoices instantly", accent: "text-brand-success" },
-            { icon: Zap, title: "Quick Sell", desc: "Bill in under 5 seconds", accent: "text-accent" },
-          ].map((f, i) => (
-            <motion.div
-              key={f.title}
-              variants={fadeUp}
-              custom={i}
-              className="glass rounded-2xl p-5 md:p-6 hover:border-primary/30 hover:-translate-y-1 transition-all duration-300 group"
-            >
+          { icon: Receipt, title: "Fast Billing", desc: "3-tap invoicing with GST", accent: "text-accent" },
+          { icon: Package, title: "Inventory", desc: "Real-time stock tracking", accent: "text-primary" },
+          { icon: BarChart3, title: "Reports", desc: "P&L, Cash Flow, Analytics", accent: "text-brand-info" },
+          { icon: Users, title: "Customer CRM", desc: "History, reminders, AMC", accent: "text-brand-success" },
+          { icon: MessageCircle, title: "WhatsApp", desc: "Share invoices instantly", accent: "text-brand-success" },
+          { icon: Zap, title: "Quick Sell", desc: "Bill in under 5 seconds", accent: "text-accent" }].
+          map((f, i) =>
+          <motion.div
+            key={f.title}
+            variants={fadeUp}
+            custom={i}
+            className="glass rounded-2xl p-5 md:p-6 hover:border-primary/30 hover:-translate-y-1 transition-all duration-300 group">
+
               <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <f.icon className={`h-5 w-5 ${f.accent}`} />
               </div>
               <h4 className="font-semibold text-sm text-foreground mb-1">{f.title}</h4>
               <p className="text-xs text-muted-foreground">{f.desc}</p>
             </motion.div>
-          ))}
+          )}
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="mt-12 text-center"
-        >
+          className="mt-12 text-center">
+
           <button
             onClick={() => navigate("/dashboard")}
-            className="gradient-primary text-primary-foreground font-bold py-4 px-10 rounded-2xl inline-flex items-center gap-3 hover:brightness-110 active:scale-[0.97] transition-all glow-primary text-base"
-          >
+            className="gradient-primary text-primary-foreground font-bold py-4 px-10 rounded-2xl inline-flex items-center gap-3 hover:brightness-110 active:scale-[0.97] transition-all glow-primary text-base">
+
             Launch Dashboard
             <ArrowRight className="h-5 w-5" />
           </button>
@@ -404,8 +404,8 @@ export default function Index() {
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
-            variants={stagger}
-          >
+            variants={stagger}>
+
             <motion.h2 variants={fadeUp} custom={0} className="font-brand text-4xl md:text-6xl text-foreground tracking-[0.03em] mb-5">
               READY TO GROW
               <br />
@@ -417,8 +417,8 @@ export default function Index() {
             <motion.div variants={fadeUp} custom={2} className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
                 onClick={() => navigate("/dashboard")}
-                className="gradient-accent text-accent-foreground font-bold py-4 px-8 rounded-2xl inline-flex items-center justify-center gap-2.5 hover:brightness-110 transition-all glow-accent text-base"
-              >
+                className="gradient-accent text-accent-foreground font-bold py-4 px-8 rounded-2xl inline-flex items-center justify-center gap-2.5 hover:brightness-110 transition-all glow-accent text-base">
+
                 <Zap className="h-5 w-5" />
                 Get Started Free
               </button>
@@ -426,8 +426,8 @@ export default function Index() {
                 href="https://wa.me/919999999999?text=Hi%2C%20I%20want%20to%20know%20more%20about%20Shree%20Umiya%20Electronics"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="glass text-foreground font-semibold py-4 px-8 rounded-2xl inline-flex items-center justify-center gap-2.5 hover:bg-card/80 transition-all"
-              >
+                className="glass text-foreground font-semibold py-4 px-8 rounded-2xl inline-flex items-center justify-center gap-2.5 hover:bg-card/80 transition-all">
+
                 <MessageCircle className="h-4 w-4 text-brand-success" />
                 WhatsApp Us
               </a>
@@ -449,6 +449,6 @@ export default function Index() {
           <p className="text-xs text-muted-foreground/50">© 2005–2026 Shree Umiya Electronics. All rights reserved.</p>
         </div>
       </footer>
-    </div>
-  );
+    </div>);
+
 }
