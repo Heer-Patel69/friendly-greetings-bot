@@ -3,7 +3,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { Share2, MessageCircle, Eye, Plus, X, ShoppingBag, Star, Phone } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import umiyaLogo from "@/assets/umiya-logo.png";
-import { useProducts, useSales, useCustomers, type Product } from "@/hooks/use-local-store";
+import { useProducts, useSales, useCustomers, type Product } from "@/hooks/use-offline-store";
 import StoreCheckout from "@/components/payment/StoreCheckout";
 import type { PaymentResult } from "@/lib/payment-service";
 

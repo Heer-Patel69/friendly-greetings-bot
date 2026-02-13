@@ -9,7 +9,7 @@ import {
   LineChart, Line, PieChart, Pie, Cell, Area, AreaChart,
 } from "recharts";
 import { PageShell } from "@/components/layout/PageShell";
-import { useSales, useProducts, useCustomers } from "@/hooks/use-local-store";
+import { useSales, useProducts, useCustomers } from "@/hooks/use-offline-store";
 import { useI18n } from "@/hooks/use-i18n";
 
 const COLORS = [

@@ -6,29 +6,8 @@ import {
   Phone, MessageCircle, ChevronRight, X, Camera, Car, Cpu,
   User, FileText, IndianRupee
 } from "lucide-react";
-
-type JobStatus = "Received" | "Diagnosed" | "Approved" | "In Progress" | "Ready" | "Delivered";
-
-interface JobCard {
-  id: string;
-  customerName: string;
-  customerPhone: string;
-  deviceType: string;
-  deviceBrand: string;
-  deviceModel: string;
-  serialNumber: string;
-  complaints: string[];
-  diagnosis: string;
-  partsEstimate: { name: string; cost: number }[];
-  laborCharge: number;
-  totalEstimate: number;
-  status: JobStatus;
-  createdAt: number;
-  photos: string[];
-  notes: string;
-  approved: boolean;
-}
-
+import { useJobCards } from "@/hooks/use-offline-store";
+import type { JobCard, JobStatus } from "@/lib/offline-db";
 const STATUS_CONFIG: Record<JobStatus, { color: string; icon: typeof Clock }> = {
   "Received": { color: "text-brand-info bg-brand-info/10", icon: Clock },
   "Diagnosed": { color: "text-brand-warning bg-brand-warning/10", icon: AlertCircle },
@@ -46,41 +25,12 @@ const COMMON_COMPLAINTS = [
 
 const DEVICE_TYPES = ["Mobile Phone", "Laptop", "Washing Machine", "AC", "Fridge", "Geyser", "Car", "Bike", "Mixer Grinder", "TV", "Other"];
 
-const DEFAULT_JOBS: JobCard[] = [
-  {
-    id: "JC-001", customerName: "Ramesh Bhai", customerPhone: "+919876500001",
-    deviceType: "Washing Machine", deviceBrand: "Samsung", deviceModel: "WA65A4002VS",
-    serialNumber: "SM-WM-2024-1122", complaints: ["Strange noise", "Leaking"],
-    diagnosis: "Drum bearing worn out. Water inlet valve loose.",
-    partsEstimate: [{ name: "Drum Bearing Set", cost: 850 }, { name: "Inlet Valve", cost: 450 }],
-    laborCharge: 600, totalEstimate: 1900, status: "Approved",
-    createdAt: Date.now() - 86400000, photos: [], notes: "Customer wants it done by Friday.", approved: true,
-  },
-  {
-    id: "JC-002", customerName: "Neha Desai", customerPhone: "+919876500002",
-    deviceType: "Mobile Phone", deviceBrand: "iPhone", deviceModel: "13 Pro",
-    serialNumber: "IP13P-4455", complaints: ["Display issue", "Battery problem"],
-    diagnosis: "", partsEstimate: [], laborCharge: 0, totalEstimate: 0,
-    status: "Received", createdAt: Date.now() - 3600000, photos: [], notes: "", approved: false,
-  },
-];
-
 export default function JobCards() {
-  const [jobs, setJobs] = useState<JobCard[]>(() => {
-    try {
-      const stored = localStorage.getItem("umiya_jobcards");
-      return stored ? JSON.parse(stored) : DEFAULT_JOBS;
-    } catch { return DEFAULT_JOBS; }
-  });
+  const { items: jobs, add: addJob, update: updateJob } = useJobCards();
   const [search, setSearch] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("All");
-
-  const saveJobs = useCallback((updated: JobCard[]) => {
-    setJobs(updated);
-    localStorage.setItem("umiya_jobcards", JSON.stringify(updated));
-  }, []);
 
   const filtered = jobs.filter((j) => {
     const matchSearch = !search ||
@@ -92,7 +42,7 @@ export default function JobCards() {
   });
 
   const updateStatus = (id: string, status: JobStatus) => {
-    saveJobs(jobs.map((j) => j.id === id ? { ...j, status } : j));
+    updateJob(id, { status });
   };
 
   const stats = {
@@ -272,7 +222,7 @@ export default function JobCards() {
       {/* New Job Card Modal */}
       <AnimatePresence>
         {showNew && <NewJobCardModal onClose={() => setShowNew(false)} onSave={(job) => {
-          saveJobs([job, ...jobs]);
+          addJob(job);
           setShowNew(false);
         }} />}
       </AnimatePresence>

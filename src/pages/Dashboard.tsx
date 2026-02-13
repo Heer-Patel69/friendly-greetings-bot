@@ -9,7 +9,7 @@ import umiyaLogo from "@/assets/umiya-logo.png";
 import { useNavigate } from "react-router-dom";
 import { useI18n, type Lang } from "@/hooks/use-i18n";
 import { useTheme } from "@/hooks/use-theme";
-import { useSales, useProducts, useCustomers } from "@/hooks/use-local-store";
+import { useSales, useProducts, useCustomers } from "@/hooks/use-offline-store";
 
 const langLabels: Record<Lang, string> = { en: "EN", hi: "हिं", gu: "ગુ" };
 const langOrder: Lang[] = ["en", "hi", "gu"];

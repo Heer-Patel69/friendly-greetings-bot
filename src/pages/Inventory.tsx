@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { PageShell } from "@/components/layout/PageShell";
 import { Package, Plus, Search, AlertTriangle, X, Check } from "lucide-react";
-import { useProducts } from "@/hooks/use-local-store";
+import { useProducts } from "@/hooks/use-offline-store";
 import { useI18n } from "@/hooks/use-i18n";
 import { VoiceInputButton } from "@/components/ui/VoiceInputButton";
 import { motion, AnimatePresence } from "framer-motion";
