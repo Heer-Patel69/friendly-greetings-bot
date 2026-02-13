@@ -120,6 +120,12 @@ export interface JobCard {
   photos: string[];
   notes: string;
   approved: boolean;
+  advancePaid?: number;
+  partsUsed?: { productId: string; qty: number; name: string; cost: number }[];
+  workLog?: { timestamp: number; entry: string; tech?: string }[];
+  invoiceId?: string;
+  approvalSentAt?: number;
+  completedAt?: number;
 }
 
 export interface SyncQueueItem {
