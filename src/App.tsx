@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
+import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Sales from "./pages/Sales";
 import Inventory from "./pages/Inventory";
@@ -25,8 +26,12 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          {/* Marketing website — standalone */}
+          <Route path="/" element={<Index />} />
+
+          {/* Business app — with sidebar/bottom nav */}
           <Route element={<AppLayout />}>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/sales" element={<Sales />} />
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/reports" element={<Reports />} />
@@ -37,6 +42,7 @@ const App = () => (
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/more" element={<More />} />
           </Route>
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

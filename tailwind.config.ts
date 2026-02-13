@@ -61,6 +61,9 @@ export default {
           gold: "hsl(var(--brand-gold))",
           "blue-light": "hsl(var(--brand-blue-light))",
           surface: "hsl(var(--brand-surface))",
+          success: "hsl(var(--brand-success))",
+          warning: "hsl(var(--brand-warning))",
+          info: "hsl(var(--brand-info))",
         },
       },
       borderRadius: {

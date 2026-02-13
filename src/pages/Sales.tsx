@@ -1,17 +1,69 @@
 import { PageShell } from "@/components/layout/PageShell";
-import { ShoppingCart, Plus, FileText } from "lucide-react";
+import { ShoppingCart, Plus, FileText, Zap, Search, Clock, IndianRupee } from "lucide-react";
+import { motion } from "framer-motion";
+
+const recentSales = [
+  { id: "INV-001", customer: "Rajesh Patel", items: "RO Service", amount: "₹1,500", time: "2h ago", status: "Paid" },
+  { id: "INV-002", customer: "Meena Shah", items: "Washing Machine Repair", amount: "₹2,800", time: "4h ago", status: "Paid" },
+  { id: "INV-003", customer: "Amit Kumar", items: "Geyser Installation", amount: "₹4,500", time: "Yesterday", status: "Pending" },
+];
 
 export default function Sales() {
   return (
     <PageShell title="Sales & Billing" subtitle="तेज़ बिल बनाएं">
       <div className="space-y-4">
-        <button className="w-full bg-accent text-accent-foreground font-bold py-4 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform">
-          <Plus className="h-5 w-5" /> New Sale
-        </button>
-        <div className="bg-card rounded-xl border border-border p-6 text-center text-muted-foreground">
-          <ShoppingCart className="h-10 w-10 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">Sales history will appear here</p>
-          <p className="text-xs mt-1">Start by creating your first sale</p>
+        {/* Quick Sell CTA */}
+        <motion.button
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full bg-accent text-accent-foreground font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg shadow-accent/20"
+        >
+          <Zap className="h-5 w-5" /> Quick Sell • तेज़ बिल बनाएं
+        </motion.button>
+
+        {/* Today Stats */}
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: "Today Sales", value: "₹12,450", icon: ShoppingCart },
+            { label: "Invoices", value: "8", icon: FileText },
+            { label: "Avg Sale", value: "₹1,556", icon: IndianRupee },
+          ].map((s) => (
+            <div key={s.label} className="bg-card rounded-2xl border border-border p-3 text-center shadow-brand">
+              <s.icon className="h-4 w-4 text-primary mx-auto mb-1.5" />
+              <p className="text-lg font-bold text-foreground">{s.value}</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input className="w-full h-12 pl-10 pr-4 rounded-2xl bg-card border border-border text-sm shadow-brand focus:ring-2 focus:ring-primary/20 outline-none transition-shadow" placeholder="Search invoices..." />
+        </div>
+
+        {/* Recent Sales */}
+        <div className="space-y-2">
+          <h4 className="text-sm font-bold text-foreground px-1">Recent Invoices</h4>
+          {recentSales.map((sale) => (
+            <div key={sale.id} className="bg-card rounded-2xl border border-border p-4 flex items-center justify-between shadow-brand hover:shadow-elevated transition-shadow">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                  {sale.customer[0]}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{sale.customer}</p>
+                  <p className="text-xs text-muted-foreground">{sale.items} • {sale.id}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-bold text-foreground">{sale.amount}</p>
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                  sale.status === "Paid" ? "bg-brand-success/10 text-brand-success" : "bg-brand-warning/10 text-brand-warning"
+                }`}>{sale.status}</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </PageShell>
