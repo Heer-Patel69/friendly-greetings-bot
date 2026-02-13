@@ -7,8 +7,8 @@ import {
 import { useProducts, useSales, useCustomers, usePayments, type Product } from "@/hooks/use-offline-store";
 import { useI18n } from "@/hooks/use-i18n";
 import { VoiceInputButton } from "@/components/ui/VoiceInputButton";
-import { downloadInvoicePDF } from "@/lib/generate-invoice-pdf";
-
+import { downloadInvoicePDF, generateAndStorePDF } from "@/lib/generate-invoice-pdf";
+import { createPaymentLink } from "@/lib/payment-service";
 const GST_RATE = 18;
 
 type CartItem = { id: string; name: string; sku: string; price: number; qty: number };
@@ -143,11 +143,34 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
   };
 
   const handleDownloadPDF = async () => {
-    await downloadInvoicePDF(getInvoiceData());
+    const data = getInvoiceData();
+    // Store + download
+    await generateAndStorePDF(data, invoiceId);
+    await downloadInvoicePDF(data);
   };
 
-  const handleDone = () => {
+  const handleDone = async () => {
     const itemNames = cart.map((i) => i.name).join(", ");
+
+    // Create payment link if balance > 0
+    let finalPaymentLink = paymentLinkUrl;
+    let finalPaymentLinkId = remaining > 0 ? `plink_${invoiceId.slice(-8)}` : undefined;
+    if (remaining > 0 && customerPhone) {
+      try {
+        const link = await createPaymentLink({
+          amount: remaining,
+          description: `Balance for ${invoiceId}`,
+          customerName: customerName || "Walk-in",
+          customerPhone,
+          invoiceId,
+        });
+        finalPaymentLink = link.shortUrl;
+        finalPaymentLinkId = link.id;
+      } catch (e) {
+        console.warn("[QuickBill] Payment link creation failed:", e);
+      }
+    }
+
     addSale({
       id: invoiceId,
       customer: customerName || "Walk-in",
@@ -158,9 +181,9 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
       status: paymentStatus,
       date: "Just now",
       timestamp: Date.now(),
-      paymentLink: paymentLinkUrl,
-      paymentLinkId: remaining > 0 ? `plink_${invoiceId.slice(-8)}` : undefined,
-      qrRef: remaining > 0 ? paymentLinkUrl : undefined,
+      paymentLink: finalPaymentLink,
+      paymentLinkId: finalPaymentLinkId,
+      qrRef: remaining > 0 ? finalPaymentLink : undefined,
     });
 
     // Record payment if any
@@ -197,6 +220,9 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
         });
       }
     }
+
+    // Store PDF in background
+    generateAndStorePDF({ ...getInvoiceData(), paymentLink: finalPaymentLink }, invoiceId).catch(console.warn);
 
     setBillDone(true);
     setTimeout(() => {

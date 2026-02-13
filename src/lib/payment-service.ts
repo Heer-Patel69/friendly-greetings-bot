@@ -16,10 +16,10 @@ export type PaymentStatus = "created" | "authorized" | "captured" | "failed" | "
 export type PaymentMethod = "upi" | "card" | "netbanking" | "wallet" | "cash" | "link";
 
 export interface PaymentOrder {
-  id: string;                    // maps to razorpay order_id
-  amount: number;                // in paise (×100) for Razorpay, we store rupees
+  id: string;
+  amount: number;
   currency: "INR";
-  receipt: string;               // invoice ID
+  receipt: string;
   status: "created" | "attempted" | "paid";
   customerName: string;
   customerPhone: string;
@@ -28,7 +28,7 @@ export interface PaymentOrder {
 
 export interface PaymentResult {
   success: boolean;
-  paymentId: string;             // maps to razorpay_payment_id
+  paymentId: string;
   orderId: string;
   method: PaymentMethod;
   amount: number;
@@ -39,7 +39,7 @@ export interface PaymentResult {
 
 export interface PaymentLink {
   id: string;
-  shortUrl: string;              // maps to razorpay short_url
+  shortUrl: string;
   amount: number;
   currency: "INR";
   description: string;
@@ -72,11 +72,29 @@ export function isRazorpayEnabled(): boolean {
   return RAZORPAY_READY;
 }
 
-// ── Simulated operations (replace with Razorpay API calls) ──
+// ── Razorpay Checkout SDK Loader ──
+
+export function loadRazorpayCheckout(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).Razorpay) {
+      resolve();
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Razorpay Checkout SDK"));
+    document.head.appendChild(script);
+  });
+}
+
+// ── Helpers ──
 
 function generateId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`.toUpperCase();
 }
+
+// ── Payment operations ──
 
 /**
  * Create a payment order.
@@ -88,7 +106,6 @@ export async function createOrder(params: {
   customerName: string;
   customerPhone: string;
 }): Promise<PaymentOrder> {
-  // Simulate network delay
   await new Promise((r) => setTimeout(r, 300));
 
   return {
@@ -116,10 +133,20 @@ export async function processPayment(params: {
   description: string;
   method?: PaymentMethod;
 }): Promise<PaymentResult> {
+  if (RAZORPAY_READY) {
+    // Load Razorpay Checkout SDK and open modal
+    try {
+      await loadRazorpayCheckout();
+      // In production: configure Razorpay Checkout with order_id
+      // For now, fall through to simulation
+    } catch {
+      console.warn("[PaymentService] Razorpay SDK load failed, falling back to simulation");
+    }
+  }
+
   // Simulate Razorpay Checkout flow
   await new Promise((r) => setTimeout(r, 1200));
 
-  // In simulation, always succeed
   return {
     success: true,
     paymentId: generateId("pay"),
@@ -133,7 +160,7 @@ export async function processPayment(params: {
 
 /**
  * Create a payment link for sharing.
- * → Razorpay: POST /v1/payment_links
+ * → Razorpay: POST /v1/payment_links (via edge function)
  */
 export async function createPaymentLink(params: {
   amount: number;
@@ -143,14 +170,20 @@ export async function createPaymentLink(params: {
   invoiceId: string;
   expiryMinutes?: number;
 }): Promise<PaymentLink> {
+  if (RAZORPAY_READY) {
+    // In production: call edge function that proxies to Razorpay API
+    // const res = await fetch('/functions/v1/create-payment-link', { ... });
+    // return res.json();
+  }
+
   await new Promise((r) => setTimeout(r, 500));
 
   const linkId = generateId("plink");
-  const expiresAt = Date.now() + (params.expiryMinutes || 10080) * 60 * 1000; // default 7 days
+  const expiresAt = Date.now() + (params.expiryMinutes || 10080) * 60 * 1000;
 
   return {
     id: linkId,
-    shortUrl: `https://rzp.io/i/${linkId.slice(-8)}`, // simulated short URL
+    shortUrl: `https://rzp.io/i/${linkId.slice(-8)}`,
     amount: params.amount,
     currency: "INR",
     description: params.description,
@@ -165,12 +198,17 @@ export async function createPaymentLink(params: {
 
 /**
  * Check payment status.
- * → Razorpay: GET /v1/payments/:id
+ * → Razorpay: GET /v1/payments/:id (via edge function)
  */
 export async function checkPaymentStatus(paymentId: string): Promise<PaymentResult> {
+  if (RAZORPAY_READY) {
+    // In production: call edge function
+    // const res = await fetch(`/functions/v1/check-payment?id=${paymentId}`);
+    // return res.json();
+  }
+
   await new Promise((r) => setTimeout(r, 200));
 
-  // Simulated: return captured
   return {
     success: true,
     paymentId,

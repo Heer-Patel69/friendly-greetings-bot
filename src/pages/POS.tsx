@@ -9,7 +9,8 @@ import { CartPanel } from "@/components/pos/CartPanel";
 import { FavoritesRow } from "@/components/pos/FavoritesRow";
 import { PaymentSheet, type PaymentMode } from "@/components/pos/PaymentSheet";
 import { useSpeechInput } from "@/hooks/use-speech-input";
-import { downloadInvoicePDF } from "@/lib/generate-invoice-pdf";
+import { downloadInvoicePDF, generateAndStorePDF } from "@/lib/generate-invoice-pdf";
+import { createPaymentLink } from "@/lib/payment-service";
 import { toast } from "sonner";
 import umiyaLogo from "@/assets/umiya-logo.png";
 
@@ -37,7 +38,7 @@ export default function POS() {
   const navigate = useNavigate();
   const { items: products, update: updateProduct } = useProducts();
   const { items: customers, update: updateCustomer } = useCustomers();
-  const { add: addSale } = useSales();
+  const { add: addSale, update: updateSale } = useSales();
   const { add: addPayment } = usePayments();
   const { items: favorites } = useFavorites();
 
@@ -109,7 +110,8 @@ export default function POS() {
 
   const handlePaymentConfirm = async (data: { mode: PaymentMode; paidAmount: number; customerName: string; customerPhone: string }) => {
     const invoiceId = generateInvoiceId();
-    const status = data.paidAmount >= total ? "Paid" : data.paidAmount > 0 ? "Partial" : "Pending";
+    const status: "Paid" | "Partial" | "Pending" = data.paidAmount >= total ? "Paid" : data.paidAmount > 0 ? "Partial" : "Pending";
+    const cartSnapshot = [...cart];
 
     const sale = {
       id: invoiceId,
@@ -164,20 +166,46 @@ export default function POS() {
     setCart([]);
     setMobileCartOpen(false);
 
-    // Generate PDF in background
+    const balance = total - data.paidAmount;
+    let paymentLinkUrl: string | undefined;
+
+    // Auto-create payment link if balance > 0
+    if (balance > 0 && data.customerPhone) {
+      try {
+        const link = await createPaymentLink({
+          amount: balance,
+          description: `Balance for ${invoiceId}`,
+          customerName: data.customerName,
+          customerPhone: data.customerPhone,
+          invoiceId,
+        });
+        paymentLinkUrl = link.shortUrl;
+        updateSale(invoiceId, { paymentLink: link.shortUrl, paymentLinkId: link.id });
+      } catch (e) {
+        console.warn("[POS] Payment link creation failed:", e);
+      }
+    }
+
+    // Generate and store PDF
+    const invoiceData = {
+      invoiceId,
+      date: sale.date,
+      customerName: data.customerName,
+      customerPhone: data.customerPhone,
+      items: cartSnapshot.map((i) => ({ name: i.name, qty: i.qty, price: i.price })),
+      subtotal,
+      gstRate: GST_RATE,
+      gstAmount,
+      total,
+      paidAmount: data.paidAmount,
+      status,
+      paymentLink: paymentLinkUrl,
+    };
+
     toast.promise(
-      downloadInvoicePDF({
-        invoiceId,
-        date: sale.date,
-        customerName: data.customerName,
-        customerPhone: data.customerPhone,
-        items: cart.map((i) => ({ name: i.name, qty: i.qty, price: i.price })),
-        subtotal,
-        gstRate: GST_RATE,
-        gstAmount,
-        total,
-        paidAmount: data.paidAmount,
-        status,
+      generateAndStorePDF(invoiceData, invoiceId).then(() => {
+        // Also trigger download
+        return downloadInvoicePDF(invoiceData);
       }),
       { loading: "Generating invoice...", success: `Invoice ${invoiceId} saved!`, error: "PDF error" }
     );
@@ -186,7 +214,7 @@ export default function POS() {
     if (data.customerPhone) {
       const ph = data.customerPhone.replace(/\D/g, "");
       const msg = encodeURIComponent(
-        `🧾 Invoice ${invoiceId}\nTotal: ₹${total.toLocaleString("en-IN")}\nPaid: ₹${data.paidAmount.toLocaleString("en-IN")}\n${status !== "Paid" ? `Balance: ₹${(total - data.paidAmount).toLocaleString("en-IN")}` : "✅ Fully Paid"}\n\n— Shree Umiya Electronics`
+        `🧾 Invoice ${invoiceId}\nTotal: ₹${total.toLocaleString("en-IN")}\nPaid: ₹${data.paidAmount.toLocaleString("en-IN")}\n${status !== "Paid" ? `Balance: ₹${(total - data.paidAmount).toLocaleString("en-IN")}${paymentLinkUrl ? `\n\n💳 Pay Online: ${paymentLinkUrl}` : ""}` : "✅ Fully Paid"}\n\n— Shree Umiya Electronics`
       );
       setTimeout(() => {
         toast("Send to WhatsApp?", {

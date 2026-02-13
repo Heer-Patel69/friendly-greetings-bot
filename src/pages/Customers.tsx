@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { PageShell } from "@/components/layout/PageShell";
-import { Search, Plus, Phone, MessageCircle, X, Check, Send, AlertTriangle, CreditCard, Link2, ChevronDown, ChevronUp, FileText, Clock, IndianRupee } from "lucide-react";
+import { Search, Plus, Phone, MessageCircle, X, Check, Send, AlertTriangle, CreditCard, Link2, ChevronDown, ChevronUp, FileText, Clock, IndianRupee, Download } from "lucide-react";
 import { useCustomers, useSales, usePayments } from "@/hooks/use-offline-store";
 import { useI18n } from "@/hooks/use-i18n";
 import { VoiceInputButton } from "@/components/ui/VoiceInputButton";
@@ -9,6 +9,9 @@ import PaymentModal from "@/components/payment/PaymentModal";
 import PaymentStatusBadge from "@/components/payment/PaymentStatusBadge";
 import { AgingBuckets } from "@/components/customers/AgingBuckets";
 import { CollectPayment } from "@/components/customers/CollectPayment";
+import { downloadStoredPDF } from "@/lib/pdf-storage";
+import { downloadInvoicePDF } from "@/lib/generate-invoice-pdf";
+import { toast } from "sonner";
 
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts;
@@ -262,7 +265,27 @@ export default function Customers() {
                                       <p className="text-xs text-foreground">{inv.items}</p>
                                       <p className="text-[10px] text-muted-foreground">{inv.id} • {inv.date}</p>
                                     </div>
-                                    <div className="text-right flex items-center gap-2">
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          const stored = await downloadStoredPDF(inv.id);
+                                          if (!stored) {
+                                            const items = inv.cartItems
+                                              ? inv.cartItems.map((i) => ({ name: i.name, qty: i.qty, price: i.price }))
+                                              : inv.items.split(", ").map((n) => ({ name: n, qty: 1, price: inv.amount }));
+                                            await downloadInvoicePDF({
+                                              invoiceId: inv.id, date: inv.date, customerName: inv.customer, customerPhone: inv.customerPhone,
+                                              items, subtotal: inv.amount, gstRate: 0, gstAmount: 0, total: inv.amount,
+                                              paidAmount: inv.paidAmount, status: inv.status, paymentLink: inv.paymentLink,
+                                            });
+                                          }
+                                          toast.success("PDF downloaded!");
+                                        }}
+                                        className="h-6 w-6 rounded-md glass flex items-center justify-center hover:bg-primary/10 transition-colors"
+                                      >
+                                        <Download className="h-3 w-3 text-primary" />
+                                      </button>
                                       <p className="text-xs font-bold text-foreground">₹{inv.amount.toLocaleString("en-IN")}</p>
                                       <PaymentStatusBadge status={inv.status} pulse={inv.status !== "Paid"} />
                                     </div>
