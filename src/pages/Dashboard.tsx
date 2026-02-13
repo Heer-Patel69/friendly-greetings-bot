@@ -1,13 +1,15 @@
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   TrendingUp, Package, Zap, ShoppingCart, Users, AlertTriangle,
   ArrowRight, ArrowUpRight, ArrowDownRight, Wallet, BarChart3,
-  Clock, CalendarDays, Activity, Sun, Moon, Globe,
+  Clock, CalendarDays, Activity, Sun, Moon, Globe, FileText,
 } from "lucide-react";
 import umiyaLogo from "@/assets/umiya-logo.png";
 import { useNavigate } from "react-router-dom";
 import { useI18n, type Lang } from "@/hooks/use-i18n";
 import { useTheme } from "@/hooks/use-theme";
+import { useSales, useProducts, useCustomers } from "@/hooks/use-local-store";
 
 const langLabels: Record<Lang, string> = { en: "EN", hi: "हिं", gu: "ગુ" };
 const langOrder: Lang[] = ["en", "hi", "gu"];
@@ -20,10 +22,25 @@ const fadeUp = {
   }),
 };
 
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return days === 1 ? "Yesterday" : `${days}d ago`;
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { t, lang, setLang } = useI18n();
   const { theme, toggleTheme } = useTheme();
+  const { items: sales } = useSales();
+  const { items: products } = useProducts();
+  const { items: customers } = useCustomers();
+
   const today = new Date();
   const dateStr = today.toLocaleDateString(lang === "hi" ? "hi-IN" : lang === "gu" ? "gu-IN" : "en-IN", { weekday: "short", day: "numeric", month: "short" });
 
@@ -32,11 +49,22 @@ export default function Dashboard() {
     setLang(langOrder[(idx + 1) % langOrder.length]);
   };
 
+  // ── Live computed stats ──
+  const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }, []);
+
+  const todaySales = useMemo(() => sales.filter((s) => s.timestamp >= todayStart), [sales, todayStart]);
+  const todayTotal = useMemo(() => todaySales.reduce((sum, s) => sum + s.amount, 0), [todaySales]);
+  const pendingInvoices = useMemo(() => sales.filter((s) => s.status === "Pending"), [sales]);
+  const pendingTotal = useMemo(() => pendingInvoices.reduce((sum, s) => sum + s.amount, 0), [pendingInvoices]);
+  const lowStockItems = useMemo(() => products.filter((p) => p.stock < 5), [products]);
+  const totalStockItems = products.length;
+  const totalOutstanding = useMemo(() => customers.reduce((s, c) => s + c.balance, 0), [customers]);
+
   const statCards = [
-    { label: t("dash.todaySales"), value: "₹12,450", change: "+12%", up: true, icon: ShoppingCart, glow: "" },
-    { label: t("dash.todayProfit"), value: "₹3,200", change: "+8%", up: true, icon: TrendingUp, glow: "glow-subtle" },
-    { label: t("dash.stockItems"), value: "248", change: "3 low", up: false, icon: Package, glow: "" },
-    { label: t("dash.cashInHand"), value: "₹45,800", change: "+₹2.1K", up: true, icon: Wallet, glow: "" },
+    { label: t("dash.todaySales"), value: `₹${todayTotal.toLocaleString("en-IN")}`, change: `${todaySales.length} bills`, up: todayTotal > 0, icon: ShoppingCart, glow: "" },
+    { label: t("dash.pendingInvoices"), value: `${pendingInvoices.length}`, change: `₹${pendingTotal.toLocaleString("en-IN")}`, up: false, icon: FileText, glow: pendingInvoices.length > 0 ? "glow-subtle" : "" },
+    { label: t("dash.stockItems"), value: String(totalStockItems), change: `${lowStockItems.length} low`, up: lowStockItems.length === 0, icon: Package, glow: "" },
+    { label: t("dash.cashInHand"), value: `₹${totalOutstanding.toLocaleString("en-IN")}`, change: `${customers.length} customers`, up: true, icon: Wallet, glow: "" },
   ];
 
   const quickActions = [
@@ -46,12 +74,7 @@ export default function Dashboard() {
     { icon: BarChart3, label: t("nav.reports"), sublabel: t("dash.details"), to: "/reports", gradient: "bg-brand-info" },
   ];
 
-  const recentSales = [
-    { name: "Rajesh Patel", item: "RO Service", amount: "₹1,500", time: "2h ago", initial: "R" },
-    { name: "Meena Shah", item: "Washing Machine Repair", amount: "₹2,800", time: "4h ago", initial: "M" },
-    { name: "Amit Kumar", item: "Geyser Installation", amount: "₹4,500", time: "Yesterday", initial: "A" },
-    { name: "Priya Desai", item: "AC Deep Clean", amount: "₹1,800", time: "Yesterday", initial: "P" },
-  ];
+  const recentSalesList = sales.slice(0, 6);
 
   return (
     <div className="min-h-screen">
@@ -62,7 +85,6 @@ export default function Dashboard() {
         <div className="absolute bottom-[-20%] left-[10%] w-[40%] h-[40%] rounded-full bg-[radial-gradient(circle,hsl(24_100%_55%/0.06),transparent_70%)] blur-3xl" />
 
         <div className="relative max-w-6xl mx-auto">
-          {/* Top bar */}
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <div className="relative">
@@ -75,7 +97,6 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {/* Mobile theme + lang toggles */}
               <button onClick={toggleTheme} className="h-8 w-8 rounded-lg glass flex items-center justify-center md:hidden">
                 {theme === "dark" ? <Sun className="h-4 w-4 text-brand-warning" /> : <Moon className="h-4 w-4 text-primary" />}
               </button>
@@ -155,89 +176,140 @@ export default function Dashboard() {
           </div>
         </motion.div>
 
-        {/* ── BUSINESS OVERVIEW ── */}
+        {/* ── PENDING INVOICES + LOW STOCK ── */}
         <div className="md:grid md:grid-cols-5 md:gap-5 space-y-5 md:space-y-0">
+          {/* Pending invoices */}
           <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={10} className="md:col-span-3 glass-strong rounded-2xl shadow-brand p-5 md:p-6">
             <div className="flex items-center justify-between mb-5">
               <div>
-                <h4 className="text-sm font-bold text-foreground">{t("dash.revenueOverview")}</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">This week vs last week</p>
+                <h4 className="text-sm font-bold text-foreground">{t("dash.pendingInvoices")}</h4>
+                <p className="text-xs text-muted-foreground mt-0.5">₹{pendingTotal.toLocaleString("en-IN")} {t("cust.outstanding").toLowerCase()}</p>
               </div>
-              <button className="text-xs text-primary font-semibold flex items-center gap-1 hover:text-brand-blue-light transition-colors">
-                {t("dash.details")} <ArrowRight className="h-3 w-3" />
+              <button onClick={() => navigate("/sales")} className="text-xs text-primary font-semibold flex items-center gap-1 hover:text-brand-blue-light transition-colors">
+                {t("dash.viewAll")} <ArrowRight className="h-3 w-3" />
               </button>
             </div>
-            <div className="h-44 md:h-52 gradient-card rounded-2xl border border-border/30 flex items-center justify-center relative overflow-hidden">
-              <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-primary/5 to-transparent" />
-              <div className="text-center relative">
-                <BarChart3 className="h-10 w-10 text-primary/20 mx-auto mb-2" />
-                <p className="text-xs text-muted-foreground/40">Connect data to see charts</p>
+            {pendingInvoices.length === 0 ? (
+              <div className="h-32 gradient-card rounded-2xl border border-border/30 flex items-center justify-center">
+                <p className="text-xs text-muted-foreground/40">✅ No pending invoices</p>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-1">
+                {pendingInvoices.slice(0, 5).map((inv) => (
+                  <div key={inv.id} className="flex items-center justify-between py-3 border-b border-border/30 last:border-0">
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-xl bg-brand-warning/10 border border-brand-warning/20 flex items-center justify-center text-brand-warning font-bold text-xs">
+                        {inv.customer[0]}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{inv.customer}</p>
+                        <p className="text-xs text-muted-foreground">{inv.items} • {inv.id}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-foreground">₹{inv.amount.toLocaleString("en-IN")}</p>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-warning/10 text-brand-warning border border-brand-warning/20">
+                        Pending
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </motion.div>
 
+          {/* Low stock alerts */}
           <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={11} className="md:col-span-2 glass-strong rounded-2xl shadow-brand p-5 md:p-6">
             <div className="flex items-center justify-between mb-5">
               <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-brand-warning" />
                 {t("dash.lowStock")}
               </h4>
-              <span className="bg-destructive/15 text-destructive text-[10px] font-bold px-2.5 py-1 rounded-full border border-destructive/20">3 items</span>
+              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                lowStockItems.length > 0
+                  ? "bg-destructive/15 text-destructive border-destructive/20"
+                  : "bg-brand-success/15 text-brand-success border-brand-success/20"
+              }`}>
+                {lowStockItems.length} items
+              </span>
             </div>
-            <div className="space-y-1">
-              {[
-                { name: "RO Filter 5-Stage", stock: 2 },
-                { name: "Geyser Rod 2KW", stock: 1 },
-                { name: "AC Gas R32 Can", stock: 3 },
-              ].map((item) => (
-                <div key={item.name} className="flex items-center justify-between py-3 border-b border-border/30 last:border-0">
-                  <span className="text-sm text-foreground">{item.name}</span>
-                  <span className="text-[10px] font-bold text-accent bg-accent/10 px-2.5 py-1 rounded-lg border border-accent/20">
-                    {item.stock} left
-                  </span>
-                </div>
-              ))}
-            </div>
+            {lowStockItems.length === 0 ? (
+              <div className="h-32 gradient-card rounded-2xl border border-border/30 flex items-center justify-center">
+                <p className="text-xs text-muted-foreground/40">✅ All items well-stocked</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {lowStockItems.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between py-3 border-b border-border/30 last:border-0">
+                    <div>
+                      <span className="text-sm text-foreground">{item.name}</span>
+                      <p className="text-[10px] text-muted-foreground">{item.sku} • ₹{item.price.toLocaleString("en-IN")}</p>
+                    </div>
+                    <span className="text-[10px] font-bold text-accent bg-accent/10 px-2.5 py-1 rounded-lg border border-accent/20">
+                      {item.stock} left
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </motion.div>
         </div>
 
-        {/* ── RECENT SALES ── */}
+        {/* ── RECENT ACTIVITY FEED ── */}
         <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={12} className="glass-strong rounded-2xl shadow-brand p-5 md:p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
               <h4 className="text-sm font-bold text-foreground">{t("dash.recentSales")}</h4>
+              <p className="text-xs text-muted-foreground mt-0.5">{sales.length} {t("sales.invoices").toLowerCase()} total</p>
             </div>
             <button onClick={() => navigate("/sales")} className="text-xs text-primary font-semibold flex items-center gap-1 hover:text-brand-blue-light transition-colors">
               {t("dash.viewAll")} <ArrowRight className="h-3 w-3" />
             </button>
           </div>
           <div className="space-y-1">
-            {recentSales.map((sale, i) => (
-              <motion.div
-                key={i}
-                variants={fadeUp}
-                initial="hidden"
-                animate="visible"
-                custom={13 + i}
-                className="flex items-center justify-between py-3 px-3 -mx-3 border-b border-border/20 last:border-0 rounded-xl hover:bg-secondary/50 transition-colors duration-200"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl gradient-card border border-primary/20 flex items-center justify-center text-primary font-bold text-sm">
-                    {sale.initial}
+            {recentSalesList.length === 0 ? (
+              <div className="h-24 flex items-center justify-center">
+                <p className="text-xs text-muted-foreground/40">No sales yet — create your first bill!</p>
+              </div>
+            ) : (
+              recentSalesList.map((sale, i) => (
+                <motion.div
+                  key={sale.id}
+                  variants={fadeUp}
+                  initial="hidden"
+                  animate="visible"
+                  custom={13 + i}
+                  className="flex items-center justify-between py-3 px-3 -mx-3 border-b border-border/20 last:border-0 rounded-xl hover:bg-secondary/50 transition-colors duration-200"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`h-10 w-10 rounded-xl border flex items-center justify-center font-bold text-sm ${
+                      sale.status === "Paid"
+                        ? "gradient-card border-primary/20 text-primary"
+                        : "bg-brand-warning/10 border-brand-warning/20 text-brand-warning"
+                    }`}>
+                      {sale.customer[0]}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{sale.customer}</p>
+                      <p className="text-xs text-muted-foreground">{sale.items} • {sale.id}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{sale.name}</p>
-                    <p className="text-xs text-muted-foreground">{sale.item}</p>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-foreground">₹{sale.amount.toLocaleString("en-IN")}</p>
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        sale.status === "Paid"
+                          ? "bg-brand-success/10 text-brand-success border-brand-success/20"
+                          : "bg-brand-warning/10 text-brand-warning border-brand-warning/20"
+                      }`}>{sale.status}</span>
+                      <p className="text-[10px] text-muted-foreground/60 flex items-center gap-0.5">
+                        <Clock className="h-2.5 w-2.5" /> {timeAgo(sale.timestamp)}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-foreground">{sale.amount}</p>
-                  <p className="text-[10px] text-muted-foreground/60 flex items-center gap-1 justify-end">
-                    <Clock className="h-2.5 w-2.5" /> {sale.time}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              ))
+            )}
           </div>
         </motion.div>
       </div>
