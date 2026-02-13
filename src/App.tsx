@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/hooks/use-auth";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
@@ -32,34 +33,36 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <Routes>
-          {/* Marketing website — standalone */}
-          <Route path="/" element={<Index />} />
-          <Route path="/stores" element={<Stores />} />
-          <Route path="/store/:slug" element={<PublicStore />} />
-          <Route path="/pos" element={<POS />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/onboarding" element={<Onboarding />} />
-          {/* Business app — with sidebar/bottom nav */}
-          <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/sales" element={<Sales />} />
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/customers" element={<Customers />} />
-            <Route path="/purchase" element={<Purchase />} />
-            <Route path="/expenses" element={<Expenses />} />
-            <Route path="/online-store" element={<OnlineStore />} />
-            <Route path="/job-cards" element={<JobCards />} />
-            <Route path="/automations" element={<Automations />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/more" element={<More />} />
-          </Route>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Marketing website — standalone */}
+            <Route path="/" element={<Index />} />
+            <Route path="/stores" element={<Stores />} />
+            <Route path="/store/:slug" element={<PublicStore />} />
+            <Route path="/pos" element={<POS />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/onboarding" element={<Onboarding />} />
+            {/* Business app — with sidebar/bottom nav */}
+            <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/sales" element={<Sales />} />
+              <Route path="/inventory" element={<Inventory />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/customers" element={<Customers />} />
+              <Route path="/purchase" element={<Purchase />} />
+              <Route path="/expenses" element={<Expenses />} />
+              <Route path="/online-store" element={<OnlineStore />} />
+              <Route path="/job-cards" element={<JobCards />} />
+              <Route path="/automations" element={<Automations />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/more" element={<More />} />
+            </Route>
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
