@@ -139,7 +139,7 @@ export default function Index() {
       <section className="border-y border-border/30 py-5">
         <div className="max-w-4xl mx-auto px-4 grid grid-cols-3 gap-4 text-center">
           {[
-            { value: LIVE_STATS.stores.toLocaleString("+"), label: "Live Stores", icon: Store },
+            { value: LIVE_STATS.stores.toLocaleString("en-IN") + "+", label: "Live Stores", icon: Store },
             { value: LIVE_STATS.bills, label: "Bills Created", icon: Receipt },
             { value: `${LIVE_STATS.cities}+`, label: "Cities", icon: MapPin },
           ].map((s) => (
