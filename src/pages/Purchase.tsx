@@ -1,5 +1,6 @@
 import { PageShell } from "@/components/layout/PageShell";
-import { Plus, CheckCircle2 } from "lucide-react";
+import { Plus } from "lucide-react";
+import { useI18n } from "@/hooks/use-i18n";
 
 const orders = [
   { id: "PO-001", supplier: "Gujarat Electronics Dist.", items: 5, total: "₹18,500", status: "Received", date: "12 Feb" },
@@ -8,26 +9,28 @@ const orders = [
 ];
 
 export default function Purchase() {
+  const { t } = useI18n();
+
   return (
-    <PageShell title="Purchases" subtitle="Supplier Management">
+    <PageShell title={t("purch.title")} subtitle={t("purch.subtitle")}>
       <div className="space-y-4">
         <button className="w-full gradient-primary text-primary-foreground font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform glow-primary">
-          <Plus className="h-5 w-5" /> New Purchase Order
+          <Plus className="h-5 w-5" /> {t("purch.newPO")}
         </button>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="glass rounded-2xl p-3 text-center">
             <p className="text-lg font-bold text-foreground">₹38,500</p>
-            <p className="text-[9px] text-muted-foreground uppercase tracking-wider">This Month</p>
+            <p className="text-[9px] text-muted-foreground uppercase tracking-wider">{t("purch.thisMonth")}</p>
           </div>
           <div className="glass rounded-2xl p-3 text-center">
             <p className="text-lg font-bold text-brand-warning">1</p>
-            <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Pending POs</p>
+            <p className="text-[9px] text-muted-foreground uppercase tracking-wider">{t("purch.pendingPOs")}</p>
           </div>
         </div>
 
         <div className="space-y-2">
-          <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-[0.15em] px-1">Recent Orders</h4>
+          <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-[0.15em] px-1">{t("purch.recentOrders")}</h4>
           {orders.map((o) => (
             <div key={o.id} className="glass rounded-2xl p-4 hover:bg-card/70 transition-colors">
               <div className="flex items-center justify-between">

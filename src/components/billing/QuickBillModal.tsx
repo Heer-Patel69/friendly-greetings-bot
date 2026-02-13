@@ -5,6 +5,8 @@ import {
   FileText, Send, CheckCircle, Percent, ShoppingBag, Zap, ScanBarcode
 } from "lucide-react";
 import { useProducts, useSales, useCustomers, type Product } from "@/hooks/use-local-store";
+import { useI18n } from "@/hooks/use-i18n";
+import { VoiceInputButton } from "@/components/ui/VoiceInputButton";
 
 const GST_RATE = 18;
 
@@ -16,6 +18,7 @@ interface QuickBillModalProps {
 }
 
 export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
+  const { t } = useI18n();
   const { items: catalog } = useProducts();
   const { add: addSale } = useSales();
   const { items: customers, add: addCustomer, update: updateCustomer } = useCustomers();
@@ -177,8 +180,8 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
               <Zap className="h-4 w-4 text-accent-foreground" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-foreground font-body">Quick Bill</h3>
-              <p className="text-[10px] text-muted-foreground">Step {step} of 3 • तेज़ बिल</p>
+              <h3 className="text-sm font-bold text-foreground font-body">{t("bill.title")}</h3>
+              <p className="text-[10px] text-muted-foreground">{t("bill.step")} {step}/3</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -210,8 +213,7 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
               <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", damping: 12, delay: 0.1 }}>
                 <CheckCircle className="h-20 w-20 text-brand-success mb-4" />
               </motion.div>
-              <p className="text-xl font-bold text-foreground">Bill Created! ✅</p>
-              <p className="text-sm text-muted-foreground mt-1">बिल बन गया!</p>
+              <p className="text-xl font-bold text-foreground">{t("bill.billCreated")} ✅</p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -239,7 +241,7 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
                       }
                     }}
                     className="w-full h-11 pl-9 pr-20 rounded-xl bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
-                    placeholder="Scan barcode / SKU..."
+                    placeholder={t("bill.scanBarcode")}
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
                     {barcodeFeedback === "found" ? "✅ Added!" :
@@ -248,14 +250,17 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
                   </span>
                 </div>
 
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full h-11 pl-9 pr-4 rounded-xl glass text-sm text-foreground placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-primary/30 outline-none"
-                    placeholder="Search products / सर्च करें..."
-                  />
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="w-full h-11 pl-9 pr-4 rounded-xl glass text-sm text-foreground placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-primary/30 outline-none"
+                      placeholder={t("bill.searchProducts")}
+                    />
+                  </div>
+                  <VoiceInputButton onResult={(text) => setSearch(text)} className="h-11 w-11 rounded-xl" />
                 </div>
 
                 <div className="space-y-1.5 max-h-[35vh] overflow-y-auto">
@@ -320,7 +325,7 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
               <motion.div key="step2" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} className="space-y-4">
                 <div className="space-y-3">
                   <div>
-                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5 block">Customer Name</label>
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5 block">{t("bill.customerName")}</label>
                     <input
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
@@ -371,7 +376,7 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
                       </div>
                     )}
                     <div className="flex justify-between text-base font-bold text-foreground pt-1">
-                      <span>Total</span>
+                      <span>{t("bill.total")}</span>
                       <span className="text-gradient-accent">₹{total.toLocaleString("en-IN")}</span>
                     </div>
                   </div>
@@ -435,7 +440,7 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
                     onClick={() => window.print()}
                     className="h-12 rounded-xl gradient-primary text-primary-foreground font-bold text-sm flex items-center justify-center gap-2 hover:brightness-110 transition-all"
                   >
-                    <FileText className="h-4 w-4" /> Print / PDF
+                    <FileText className="h-4 w-4" /> {t("bill.printPdf")}
                   </motion.button>
                 </div>
               </motion.div>
@@ -451,7 +456,7 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
               onClick={() => setStep((s) => (s - 1) as 1 | 2 | 3)}
               className="h-12 px-5 rounded-xl glass font-semibold text-sm text-foreground flex items-center gap-2 hover:bg-card/80 transition-colors"
             >
-              <ArrowLeft className="h-4 w-4" /> Back
+              <ArrowLeft className="h-4 w-4" /> {t("bill.back")}
             </motion.button>
           )}
           {step < 3 ? (
@@ -461,7 +466,7 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
               onClick={() => setStep((s) => (s + 1) as 1 | 2 | 3)}
               className="flex-1 h-12 rounded-xl gradient-accent text-accent-foreground font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40 disabled:pointer-events-none glow-accent hover:brightness-110 transition-all"
             >
-              {step === 1 ? "Review & GST" : "Preview Invoice"} <ArrowRight className="h-4 w-4" />
+              {step === 1 ? t("bill.reviewGst") : t("bill.previewInvoice")} <ArrowRight className="h-4 w-4" />
             </motion.button>
           ) : (
             <motion.button
@@ -469,7 +474,7 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
               onClick={handleDone}
               className="flex-1 h-12 rounded-xl gradient-accent text-accent-foreground font-bold text-sm flex items-center justify-center gap-2 glow-accent hover:brightness-110 transition-all"
             >
-              <CheckCircle className="h-4 w-4" /> Done • बिल पूरा ✅
+              <CheckCircle className="h-4 w-4" /> {t("bill.done")} ✅
             </motion.button>
           )}
         </div>

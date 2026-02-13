@@ -7,19 +7,21 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const navItems = [
-  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/sales", icon: ShoppingCart, label: "Sales" },
-  { to: "/inventory", icon: Package, label: "Inventory" },
-  { to: "/reports", icon: BarChart3, label: "Reports" },
-  { to: "/more", icon: MoreHorizontal, label: "More" },
-];
+import { useI18n } from "@/hooks/use-i18n";
 
 export function BottomNav() {
+  const { t } = useI18n();
+
+  const navItems = [
+    { to: "/dashboard", icon: LayoutDashboard, label: t("nav.dashboard") },
+    { to: "/sales", icon: ShoppingCart, label: t("nav.sales") },
+    { to: "/inventory", icon: Package, label: t("nav.inventory") },
+    { to: "/reports", icon: BarChart3, label: t("nav.reports") },
+    { to: "/more", icon: MoreHorizontal, label: t("nav.more") },
+  ];
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
-      {/* Glass background */}
       <div className="absolute inset-0 bg-card/80 backdrop-blur-2xl border-t border-border/30" />
       <div className="relative flex items-center justify-around h-[64px] pb-safe">
         {navItems.map((item) => (

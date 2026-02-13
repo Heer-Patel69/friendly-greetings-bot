@@ -10,29 +10,43 @@ import {
   Wallet,
   Truck,
   Settings,
-  Zap,
+  Sun,
+  Moon,
+  Globe,
 } from "lucide-react";
 import umiyaLogo from "@/assets/umiya-logo.png";
 import { cn } from "@/lib/utils";
+import { useI18n, type Lang } from "@/hooks/use-i18n";
+import { useTheme } from "@/hooks/use-theme";
 
-const sidebarLinks = [
-  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/sales", icon: ShoppingCart, label: "Sales & Billing" },
-  { to: "/inventory", icon: Package, label: "Inventory" },
-  { to: "/purchase", icon: Truck, label: "Purchases" },
-  { to: "/expenses", icon: Wallet, label: "Expenses" },
-  { to: "/customers", icon: Users, label: "Customers" },
-  { to: "/online-store", icon: Store, label: "Online Store" },
-  { to: "/reports", icon: BarChart3, label: "Reports" },
-  { to: "/settings", icon: Settings, label: "Settings" },
-];
+const langLabels: Record<Lang, string> = { en: "EN", hi: "हिं", gu: "ગુ" };
+const langOrder: Lang[] = ["en", "hi", "gu"];
 
 export function AppLayout() {
+  const { t, lang, setLang } = useI18n();
+  const { theme, toggleTheme } = useTheme();
+
+  const sidebarLinks = [
+    { to: "/dashboard", icon: LayoutDashboard, label: t("nav.dashboard") },
+    { to: "/sales", icon: ShoppingCart, label: t("nav.sales") },
+    { to: "/inventory", icon: Package, label: t("nav.inventory") },
+    { to: "/purchase", icon: Truck, label: t("nav.purchases") },
+    { to: "/expenses", icon: Wallet, label: t("nav.expenses") },
+    { to: "/customers", icon: Users, label: t("nav.customers") },
+    { to: "/online-store", icon: Store, label: t("nav.onlineStore") },
+    { to: "/reports", icon: BarChart3, label: t("nav.reports") },
+    { to: "/settings", icon: Settings, label: t("nav.settings") },
+  ];
+
+  const cycleLang = () => {
+    const idx = langOrder.indexOf(lang);
+    setLang(langOrder[(idx + 1) % langOrder.length]);
+  };
+
   return (
     <div className="min-h-screen flex bg-background">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-[260px] fixed inset-y-0 left-0 z-40 border-r border-border/30">
-        {/* Background */}
         <div className="absolute inset-0 bg-sidebar" />
         <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.03] via-transparent to-accent/[0.02]" />
 
@@ -53,7 +67,6 @@ export function AppLayout() {
 
           {/* Nav */}
           <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-            <p className="text-[9px] text-sidebar-foreground/30 uppercase tracking-[0.2em] px-4 mb-2 font-medium">Main Menu</p>
             {sidebarLinks.map((link) => (
               <NavLink
                 key={link.to}
@@ -73,11 +86,23 @@ export function AppLayout() {
             ))}
           </nav>
 
-          {/* Footer */}
-          <div className="p-4 border-t border-sidebar-border/30">
-            <div className="glass rounded-xl p-3 text-center">
-              <p className="text-[9px] text-sidebar-foreground/30 uppercase tracking-[0.15em]">Established</p>
-              <p className="text-xs text-sidebar-foreground/60 mt-0.5 font-medium">2005 • 20,000+ Solutions</p>
+          {/* Footer with theme + lang toggles */}
+          <div className="p-4 border-t border-sidebar-border/30 space-y-2">
+            <div className="flex gap-2">
+              <button
+                onClick={toggleTheme}
+                className="flex-1 h-9 glass rounded-xl flex items-center justify-center gap-1.5 text-xs font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors"
+              >
+                {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+                {theme === "dark" ? t("common.light") : t("common.dark")}
+              </button>
+              <button
+                onClick={cycleLang}
+                className="flex-1 h-9 glass rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors"
+              >
+                <Globe className="h-3.5 w-3.5" />
+                {langLabels[lang]}
+              </button>
             </div>
           </div>
         </div>
