@@ -1,5 +1,6 @@
 import { Outlet, NavLink } from "react-router-dom";
 import { BottomNav } from "./BottomNav";
+import { ConnectivityDot } from "./ConnectivityDot";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -58,10 +59,11 @@ export function AppLayout() {
                 <div className="absolute inset-0 rounded-xl bg-accent/15 blur-lg scale-150" />
                 <img src={umiyaLogo} alt="" className="relative h-10 w-10 rounded-xl ring-1 ring-white/10" />
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="font-brand text-sm tracking-[0.06em] text-sidebar-foreground">SHREE UMIYA</p>
                 <p className="text-[8px] text-sidebar-foreground/30 uppercase tracking-[0.2em]">Electronics</p>
               </div>
+              <ConnectivityDot />
             </div>
           </div>
 

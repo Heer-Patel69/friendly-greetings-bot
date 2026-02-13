@@ -136,6 +136,23 @@ export interface SyncQueueItem {
   payload: string; // JSON stringified
   createdAt: number;
   synced: 0 | 1;
+  retryCount?: number;
+  lastError?: string;
+  failedAt?: number;
+  conflictResolution?: "pending" | "resolved" | "conflict";
+}
+
+export interface PurchaseOrder {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  items: { productId: string; name: string; sku: string; qty: number; cost: number }[];
+  total: number;
+  status: "Draft" | "Sent" | "Received" | "Cancelled";
+  sentAt?: number;
+  receivedAt?: number;
+  createdAt: number;
+  notes?: string;
 }
 
 // ── Database ──
@@ -150,6 +167,7 @@ class DukaanDB extends Dexie {
   favorites!: Table<Favorite, string>;
   suppliers!: Table<Supplier, string>;
   storeProfile!: Table<StoreProfile, string>;
+  purchaseOrders!: Table<PurchaseOrder, string>;
 
   constructor() {
     super("dukaanos");
@@ -200,6 +218,20 @@ class DukaanDB extends Dexie {
         p.barcode = p.barcode ?? "";
         p.visibility = p.storeVisible === false ? "offline" : "both";
       });
+    });
+
+    // v5: Add purchaseOrders table
+    this.version(5).stores({
+      products: "id, sku, category, name, barcode, supplierId",
+      customers: "id, phone, name",
+      sales: "id, customer, status, timestamp",
+      payments: "id, saleId, timestamp, customer",
+      jobCards: "id, status, createdAt, customerPhone",
+      syncQueue: "++id, table, synced, createdAt",
+      favorites: "id, productId, position",
+      suppliers: "id, name, phone",
+      storeProfile: "id",
+      purchaseOrders: "id, supplierId, status, createdAt",
     });
   }
 }
@@ -327,18 +359,24 @@ export function startSyncService() {
 
     // TODO: Replace with actual cloud API calls
     console.log(`[Sync] ${pending.length} items pending — will push when cloud is connected`);
-    // For now, mark as synced (no-op)
-    // await markSynced(pending.map(p => p.id!));
   };
 
-  // Run on reconnect
   window.addEventListener("online", sync);
-
-  // Periodic check every 30s
   const interval = setInterval(sync, 30000);
 
   return () => {
     window.removeEventListener("online", sync);
     clearInterval(interval);
   };
+}
+
+// ── Sync stats ──
+
+export async function getSyncStats() {
+  const pending = await db.syncQueue.where("synced").equals(0).toArray();
+  const byTable: Record<string, number> = {};
+  pending.forEach(item => {
+    byTable[item.table] = (byTable[item.table] ?? 0) + 1;
+  });
+  return { total: pending.length, byTable };
 }
