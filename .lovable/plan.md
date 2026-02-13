@@ -1,195 +1,248 @@
 
 
-# Phase 2 Feature Build: Super-Fast POS + Customer Ledger (Udhaar/Khata)
+# Phase 3: Inventory Engine + Online Mini-Store Enhancement
 
-This plan upgrades two core modules from their current basic state into production-grade, mobile-first experiences as described in the feature cards.
+Two feature upgrades that extend the existing Product and Store systems into production-grade, multi-image, supplier-aware inventory management and a public-facing store directory with real product catalogs.
 
 ---
 
 ## What Changes
 
-### 1. Redesigned POS / Quick-Sell (replaces current QuickBillModal)
+### 1. Inventory Engine (Enhanced Product Management)
 
-The current `QuickBillModal` is a 3-step modal. We will replace it with a **full-screen POS page** at `/pos` optimized for speed:
+The current `Inventory.tsx` has basic add/list with name, SKU, price, category, stock. We upgrade it to a full product management system:
 
-**Mobile layout (single column):**
-- Top bar: store name + connectivity indicator (online/offline dot)
-- Search row: text input + mic button + barcode scan button
-- Favorites row: horizontally scrollable quick-add chips (configurable per store)
-- Product grid: large tap-friendly cards with name, price, stock, and "+" button
-- Persistent bottom cart panel (~35% height, slide-up drawer): item list with qty +/- controls, promo code field, subtotal, GST line, grand total
-- Sticky payment row at very bottom: three large buttons — CASH, UPI, UDHAAR
-
-**Desktop layout:**
-- Left 70%: product search + grid
-- Right 30%: persistent cart sidebar with payment buttons
-- Keyboard shortcuts: F1=Cash, F2=UPI, F3=Udhaar
-
-**Payment flow:**
-- CASH: instant confirm, generate invoice, show success
-- UPI: modal with paid amount input (defaults to full), auto-calc balance, generate invoice with QR
-- UDHAAR: full amount as credit, link to customer
-- Partial: enter amount received, remainder becomes udhaar
-
-**After confirm:**
-- Invoice saved to IndexedDB immediately
-- PDF generated in background (jsPDF — reuse existing generator)
-- Toast notification with options: "Download PDF" | "Send WhatsApp" | "New Bill"
-- Cart clears, POS stays ready for next customer
-
-**Voice-add (differentiator):**
-- Use existing `useSpeechInput` hook
-- Parse voice result against product catalog with fuzzy matching
-- Example: "2 RO filter" matches "RO Filter 5-Stage" and adds qty 2
-
-**Barcode (enhanced):**
-- Reuse existing barcode input logic but add debounce for rapid scans
-- Visual feedback: green flash on match, red shake on no-match
-
-### 2. Customer Ledger / Udhaar Page (replaces current Customers page)
-
-The current `Customers.tsx` already has basic udhaar tracking. We will enhance it significantly:
-
-**Mobile layout:**
-- Search bar + voice + "Add Customer" button (keep existing)
-- Summary cards: Total Customers | Total Outstanding | Overdue Count
-- Udhaar alert section with aging buckets (0-7 days, 7-30 days, 30+ days) — color-coded
-- Customer list as expandable cards:
-  - Collapsed: Name | Phone | Total Due (prominent) | [Collect] [WhatsApp]
-  - Expanded: Tabs — History | Invoices | Payments
-    - History tab: timeline of all transactions
-    - Invoices tab: linked invoices with status badges
-    - Payments tab: all partial payments recorded
-  - Quick action floating: [Collect Payment] button
-
-**New features to add:**
-- **Aging buckets**: Calculate days since oldest unpaid invoice, categorize into 0-7d (green), 7-30d (yellow), 30+d (red)
-- **Credit limit flag**: Add `creditLimit` field to Customer type; show warning when balance exceeds limit
-- **WhatsApp reminder templates**: Pre-filled message with customer name, amount, and pay-link placeholder
-- **Collect payment flow**: Enter amount, select method (Cash/UPI/Card), auto-deduct from balance, record in payments table
-- **Payment history per customer**: Show all payments with timestamps and methods
-
-### 3. Data Model Updates
-
-**Existing `Customer` type — add fields:**
+**Data model additions to `Product` type:**
 ```
-creditLimit: number (default 0 = unlimited)
-tags: string[] (e.g., "regular", "wholesale")
-address: string
+barcode?: string
+images: string[]         (base64 data URLs stored locally — no cloud needed yet)
+coverImage?: string      (index into images array or URL)
+cost?: number            (buy price for profit tracking)
+gst?: number             (product-level GST %, default 18)
+reorderLevel?: number    (triggers low-stock alert)
+supplierId?: string      (links to supplier)
+visibility?: "online" | "offline" | "both"  (replaces storeVisible boolean)
 ```
 
-**Existing `Sale` type — add field:**
+**New `Supplier` type + table in IndexedDB:**
 ```
-cartItems: { id, name, sku, price, qty, gst }[] (structured items instead of string)
-```
-
-**New `Favorite` type in offline-db:**
-```
-id: string
-storeId: string  
-productId: string
-position: number
+Supplier { id, name, phone, email, company, notes }
 ```
 
-**IndexedDB schema bump:** Version 2 migration to add new indexes and fields.
+**Enhanced Inventory page features:**
+- Filter bar: "All" | "Low Stock" | "Online" | "Offline" chips
+- Product cards show thumbnail image (first from images array) instead of generic icon
+- Tap product card to open detail view (slide-up sheet)
+- Product detail: image carousel at top, stock badge, edit form, transaction history (sales referencing this SKU)
+- "Reorder from Supplier" button that opens WhatsApp with templated message
 
-### 4. New Files to Create
+**Enhanced Add/Edit Product form:**
+- Multi-image upload: file input accepting multiple images, stored as base64 data URLs in IndexedDB
+- Image preview carousel with cover image selection (tap to set cover)
+- Barcode field with scan button
+- Cost price + Sale price + GST % fields
+- Reorder level field
+- Supplier dropdown (from suppliers table)
+- Visibility toggle: Online / Offline / Both
 
-| File | Purpose |
-|------|---------|
-| `src/pages/POS.tsx` | Full-screen POS page |
-| `src/components/pos/ProductGrid.tsx` | Searchable, filterable product grid |
-| `src/components/pos/CartPanel.tsx` | Slide-up cart with totals |
-| `src/components/pos/PaymentSheet.tsx` | Payment mode selection + confirmation |
-| `src/components/pos/FavoritesRow.tsx` | Horizontal scroll quick-add chips |
-| `src/components/customers/AgingBuckets.tsx` | Color-coded aging visualization |
-| `src/components/customers/CustomerDetail.tsx` | Expanded customer view with tabs |
-| `src/components/customers/CollectPayment.tsx` | Payment collection form |
+**Stock auto-decrement:**
+- When a sale is created in POS, decrement `stock` for each cart item
+- If stock falls below `reorderLevel`, show toast alert
 
-### 5. Files to Modify
+**CSV Import (basic v1):**
+- Button to upload CSV file
+- Parse CSV with headers: name, sku, price, cost, stock, category, gst
+- Preview parsed rows in a table
+- Confirm to bulk-insert into products table
 
-| File | Change |
-|------|--------|
-| `src/lib/offline-db.ts` | Bump to v2, add `favorites` table, extend Customer/Sale types |
-| `src/hooks/use-offline-store.ts` | Add `useFavorites()` hook |
-| `src/App.tsx` | Add `/pos` route |
-| `src/pages/Sales.tsx` | "Quick Sell" button navigates to `/pos` instead of opening modal |
-| `src/pages/Dashboard.tsx` | "Quick Sell" action navigates to `/pos` |
-| `src/pages/Customers.tsx` | Major rewrite with aging, tabs, enhanced collect flow |
-| `src/components/layout/BottomNav.tsx` | Optionally add POS shortcut |
+### 2. Online Mini-Store + Store Directory Enhancement
 
-### 6. Edge Cases Handled
+The current `OnlineStore.tsx` shows products with emoji placeholders and basic Buy Now / Enquire flow. The current `Stores.tsx` uses hardcoded mock data. We upgrade both:
 
-- **Duplicate barcode rapid scan**: 300ms debounce on barcode input
-- **Partial payment > total**: Validation — cap at total amount
-- **Offline + app close before sync**: Items remain in IndexedDB `syncQueue` with `synced: 0`, picked up on next app open
-- **Duplicate phone numbers**: Enforce store-scoped uniqueness check on add
-- **Empty cart submit**: Disabled state on payment buttons when cart is empty
-- **Customer not found during billing**: Option to create inline
+**Store Profile model (new fields on a config object stored in IndexedDB):**
+```
+StoreProfile { id, name, slug, logo, description, address, city, categories, isOpen, phone, whatsapp }
+```
+New `storeProfile` table in IndexedDB (single-row config).
 
----
+**Online Store page enhancements:**
+- Product cards show actual product images (from `images` array) instead of emoji placeholders
+- Image carousel on product detail view
+- "Book Installation" button for service-category products
+- Cover image displayed as card thumbnail
+- Stock badge with real-time quantity
+- Visibility filter respects new `visibility` field
 
-## Technical Details
+**Store profile editor (in Online Store page):**
+- Edit store name, description, address, city
+- Upload store logo
+- Set open/closed status
+- Configure WhatsApp number for enquiries
 
-### IndexedDB v2 Migration
+**Stores directory (`/stores`) enhancements:**
+- Pull store data from IndexedDB `storeProfile` (own store always shown)
+- Mock stores remain as fallback/demo data
+- Store profile cards show logo image if available
+- Product listings under each store show real images
 
-```typescript
-this.version(2).stores({
-  products: "id, sku, category, name",
+**Public store route `/store/:slug` (new page):**
+- Standalone public page (no sidebar) for a single store
+- Store header with logo, name, description, open/closed badge
+- Contact CTAs: Call, WhatsApp, Visit Store
+- Product grid with image carousels, price, stock badge
+- Buy Now and Enquire on WhatsApp buttons per product
+- Mobile-first responsive layout
+
+### 3. IndexedDB Schema v3 Migration
+
+Bump to version 3 to add `suppliers` and `storeProfile` tables and extend `products`:
+
+```
+this.version(3).stores({
+  products: "id, sku, category, name, barcode, supplierId",
   customers: "id, phone, name",
   sales: "id, customer, status, timestamp",
   payments: "id, saleId, timestamp, customer",
   jobCards: "id, status, createdAt, customerPhone",
   syncQueue: "++id, table, synced, createdAt",
   favorites: "id, productId, position",
+  suppliers: "id, name, phone",
+  storeProfile: "id",
 }).upgrade(tx => {
-  // Add default values for new Customer fields
-  tx.table("customers").toCollection().modify(c => {
-    c.creditLimit = c.creditLimit ?? 0;
-    c.tags = c.tags ?? [];
-    c.address = c.address ?? "";
+  tx.table("products").toCollection().modify(p => {
+    p.images = p.images ?? [];
+    p.coverImage = p.coverImage ?? "";
+    p.cost = p.cost ?? 0;
+    p.gst = p.gst ?? 18;
+    p.reorderLevel = p.reorderLevel ?? 5;
+    p.supplierId = p.supplierId ?? "";
+    p.barcode = p.barcode ?? "";
+    p.visibility = p.storeVisible === false ? "offline" : "both";
   });
 });
 ```
 
-### POS Performance Targets
-- Product search: debounced 150ms, fuzzy match via `includes()`
-- Cart operations: in-memory React state (not DB) for instant updates
-- Invoice save: single IndexedDB transaction (~5ms)
-- PDF generation: async, non-blocking after save confirmation
+### 4. New Files to Create
 
-### Voice-Add Parser (simple v1)
+| File | Purpose |
+|------|---------|
+| `src/components/inventory/ProductDetail.tsx` | Slide-up product detail with image carousel, edit form, transaction history |
+| `src/components/inventory/ImageUploader.tsx` | Multi-image picker with preview carousel and cover selection |
+| `src/components/inventory/CSVImport.tsx` | CSV file upload, parse, preview table, and bulk import |
+| `src/components/inventory/SupplierSelect.tsx` | Supplier dropdown with inline "Add new" option |
+| `src/components/store/StoreProfileEditor.tsx` | Edit store profile form (name, logo, description, city) |
+| `src/pages/PublicStore.tsx` | Public-facing store page at `/store/:slug` |
+
+### 5. Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/lib/offline-db.ts` | v3 schema, add Supplier + StoreProfile types, extend Product type |
+| `src/hooks/use-offline-store.ts` | Add `useSuppliers()` and `useStoreProfile()` hooks |
+| `src/pages/Inventory.tsx` | Major rewrite: filters, multi-image product form, product detail sheet, CSV import, supplier reorder |
+| `src/pages/OnlineStore.tsx` | Use real product images, store profile editor, visibility filter, Book Installation button |
+| `src/pages/Stores.tsx` | Integrate storeProfile data alongside mock stores |
+| `src/pages/POS.tsx` | Auto-decrement stock on sale confirmation, low-stock toast |
+| `src/App.tsx` | Add `/store/:slug` route |
+
+### 6. Edge Cases
+
+- **Large images in IndexedDB**: Resize images client-side before storing (max 800px width, JPEG compression at 0.7 quality) to prevent DB bloat
+- **CSV with duplicate SKUs**: Show warning row, skip or overwrite based on user choice
+- **Stock goes negative from offline conflicts**: Floor at 0, show warning badge
+- **No images uploaded**: Fall back to category emoji (existing behavior)
+- **Store profile not configured**: Show setup wizard on first visit to Online Store page
+
+---
+
+## Technical Details
+
+### Image Handling (Client-Side Only)
+
+Since there's no cloud storage yet, images are stored as compressed base64 data URLs in IndexedDB. A utility function resizes and compresses:
+
 ```typescript
-function parseVoiceInput(text: string, catalog: Product[]) {
-  const qtyMatch = text.match(/(\d+)/);
-  const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
-  const cleanText = text.replace(/\d+/g, "").trim().toLowerCase();
-  const match = catalog.find(p => 
-    p.name.toLowerCase().includes(cleanText) || 
-    cleanText.includes(p.name.toLowerCase().split(" ")[0])
-  );
-  return match ? { product: match, qty } : null;
+async function compressImage(file: File, maxWidth = 800): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const scale = Math.min(1, maxWidth / img.width);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", 0.7));
+    };
+    img.src = URL.createObjectURL(file);
+  });
 }
 ```
 
-### Aging Calculation
+### Stock Decrement on Sale
+
+In `POS.tsx` `handlePaymentConfirm`, after saving the sale:
+
 ```typescript
-function getAgingBucket(oldestUnpaidTimestamp: number): "current" | "warning" | "overdue" {
-  const days = (Date.now() - oldestUnpaidTimestamp) / 86400000;
-  if (days <= 7) return "current";
-  if (days <= 30) return "warning";
-  return "overdue";
+// Decrement stock for each cart item
+for (const item of cart) {
+  const product = products.find(p => p.id === item.id);
+  if (product) {
+    const newStock = Math.max(0, product.stock - item.qty);
+    await updateProduct(product.id, { stock: newStock });
+    if (newStock <= (product.reorderLevel ?? 5)) {
+      toast.warning(`Low stock: ${product.name} (${newStock} left)`);
+    }
+  }
+}
+```
+
+### CSV Parser (simple v1)
+
+```typescript
+function parseCSV(text: string): Partial<Product>[] {
+  const lines = text.trim().split("\n");
+  const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
+  return lines.slice(1).map(line => {
+    const vals = line.split(",");
+    const row: any = {};
+    headers.forEach((h, i) => { row[h] = vals[i]?.trim(); });
+    return {
+      id: `csv-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
+      name: row.name || "",
+      sku: (row.sku || "").toUpperCase(),
+      price: Number(row.price) || 0,
+      cost: Number(row.cost) || 0,
+      stock: Number(row.stock) || 0,
+      category: row.category || "Other",
+      gst: Number(row.gst) || 18,
+      images: [],
+      reorderLevel: 5,
+    };
+  }).filter(p => p.name && p.sku);
+}
+```
+
+### Supplier WhatsApp Reorder
+
+```typescript
+function reorderFromSupplier(supplier: Supplier, product: Product) {
+  const msg = encodeURIComponent(
+    `🔄 Reorder Request\n\nProduct: ${product.name}\nSKU: ${product.sku}\nCurrent Stock: ${product.stock}\nSuggested Qty: ${Math.max(10, (product.reorderLevel ?? 5) * 3)}\n\n— Sent from DukaanOS`
+  );
+  window.open(`https://wa.me/${supplier.phone.replace(/\D/g, "")}?text=${msg}`, "_blank");
 }
 ```
 
 ## Build Order
 
-1. Update `offline-db.ts` — schema v2 + new types
-2. Update `use-offline-store.ts` — new hooks
-3. Build POS components (ProductGrid, CartPanel, PaymentSheet, FavoritesRow)
-4. Build POS page and wire to route
-5. Build customer enhancement components (AgingBuckets, CustomerDetail, CollectPayment)
-6. Rewrite Customers page with new components
-7. Update Dashboard and Sales to point to new POS
-8. Test offline flow end-to-end
+1. Update `offline-db.ts` -- schema v3, new types (Supplier, StoreProfile), extend Product
+2. Update `use-offline-store.ts` -- add `useSuppliers()`, `useStoreProfile()` hooks
+3. Create utility: `ImageUploader`, `CSVImport`, `SupplierSelect` components
+4. Create `ProductDetail` sheet component
+5. Rewrite `Inventory.tsx` with filters, enhanced form, product detail, CSV import
+6. Update `POS.tsx` with stock decrement + low-stock alerts
+7. Create `StoreProfileEditor` and `PublicStore.tsx`
+8. Update `OnlineStore.tsx` with real images and profile editor
+9. Update `Stores.tsx` to integrate real store profile
+10. Add `/store/:slug` route to `App.tsx`
 
