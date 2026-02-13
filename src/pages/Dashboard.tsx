@@ -60,9 +60,11 @@ export default function Dashboard() {
   const totalStockItems = products.length;
   const totalOutstanding = useMemo(() => customers.reduce((s, c) => s + c.balance, 0), [customers]);
 
+  const totalUdhaar = useMemo(() => sales.filter((s) => s.status !== "Paid").reduce((sum, s) => sum + (s.amount - (s.paidAmount || 0)), 0), [sales]);
+
   const statCards = [
     { label: t("dash.todaySales"), value: `₹${todayTotal.toLocaleString("en-IN")}`, change: `${todaySales.length} bills`, up: todayTotal > 0, icon: ShoppingCart, glow: "" },
-    { label: t("dash.pendingInvoices"), value: `${pendingInvoices.length}`, change: `₹${pendingTotal.toLocaleString("en-IN")}`, up: false, icon: FileText, glow: pendingInvoices.length > 0 ? "glow-subtle" : "" },
+    { label: "Udhaar", value: `₹${totalUdhaar.toLocaleString("en-IN")}`, change: `${sales.filter((s) => s.status !== "Paid").length} pending`, up: false, icon: FileText, glow: totalUdhaar > 0 ? "glow-subtle" : "" },
     { label: t("dash.stockItems"), value: String(totalStockItems), change: `${lowStockItems.length} low`, up: lowStockItems.length === 0, icon: Package, glow: "" },
     { label: t("dash.cashInHand"), value: `₹${totalOutstanding.toLocaleString("en-IN")}`, change: `${customers.length} customers`, up: true, icon: Wallet, glow: "" },
   ];
@@ -182,8 +184,8 @@ export default function Dashboard() {
           <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={10} className="md:col-span-3 glass-strong rounded-2xl shadow-brand p-5 md:p-6">
             <div className="flex items-center justify-between mb-5">
               <div>
-                <h4 className="text-sm font-bold text-foreground">{t("dash.pendingInvoices")}</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">₹{pendingTotal.toLocaleString("en-IN")} {t("cust.outstanding").toLowerCase()}</p>
+                <h4 className="text-sm font-bold text-foreground">Udhaar / Pending Bills</h4>
+                <p className="text-xs text-muted-foreground mt-0.5">₹{pendingTotal.toLocaleString("en-IN")} total pending</p>
               </div>
               <button onClick={() => navigate("/sales")} className="text-xs text-primary font-semibold flex items-center gap-1 hover:text-brand-blue-light transition-colors">
                 {t("dash.viewAll")} <ArrowRight className="h-3 w-3" />
@@ -300,7 +302,9 @@ export default function Dashboard() {
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                         sale.status === "Paid"
                           ? "bg-brand-success/10 text-brand-success border-brand-success/20"
-                          : "bg-brand-warning/10 text-brand-warning border-brand-warning/20"
+                          : sale.status === "Partial"
+                          ? "bg-brand-warning/10 text-brand-warning border-brand-warning/20"
+                          : "bg-destructive/10 text-destructive border-destructive/20"
                       }`}>{sale.status}</span>
                       <p className="text-[10px] text-muted-foreground/60 flex items-center gap-0.5">
                         <Clock className="h-2.5 w-2.5" /> {timeAgo(sale.timestamp)}

@@ -21,6 +21,9 @@ export interface Product {
   price: number;
   category: string;
   stock: number;
+  description?: string;
+  images?: string[];
+  storeVisible?: boolean;
 }
 
 export interface Customer {
@@ -38,9 +41,19 @@ export interface Sale {
   customerPhone: string;
   items: string;
   amount: number;
-  status: "Paid" | "Pending";
+  paidAmount: number;
+  status: "Paid" | "Partial" | "Pending";
   date: string;
   timestamp: number;
+}
+
+export interface Payment {
+  id: string;
+  saleId: string;
+  customer: string;
+  amount: number;
+  timestamp: number;
+  method: "Cash" | "UPI" | "Card" | "Online";
 }
 
 // ── Default seed data ──
@@ -65,10 +78,12 @@ const DEFAULT_CUSTOMERS: Customer[] = [
 ];
 
 const DEFAULT_SALES: Sale[] = [
-  { id: "INV-001", customer: "Rajesh Patel", customerPhone: "+919876543210", items: "RO Service", amount: 1500, status: "Paid", date: "2h ago", timestamp: Date.now() - 7200000 },
-  { id: "INV-002", customer: "Meena Shah", customerPhone: "+919876543211", items: "Washing Machine Repair", amount: 2800, status: "Paid", date: "4h ago", timestamp: Date.now() - 14400000 },
-  { id: "INV-003", customer: "Amit Kumar", customerPhone: "+919876543212", items: "Geyser Installation", amount: 4500, status: "Pending", date: "Yesterday", timestamp: Date.now() - 86400000 },
+  { id: "INV-001", customer: "Rajesh Patel", customerPhone: "+919876543210", items: "RO Service", amount: 1500, paidAmount: 1500, status: "Paid", date: "2h ago", timestamp: Date.now() - 7200000 },
+  { id: "INV-002", customer: "Meena Shah", customerPhone: "+919876543211", items: "Washing Machine Repair", amount: 2800, paidAmount: 2800, status: "Paid", date: "4h ago", timestamp: Date.now() - 14400000 },
+  { id: "INV-003", customer: "Amit Kumar", customerPhone: "+919876543212", items: "Geyser Installation", amount: 4500, paidAmount: 0, status: "Pending", date: "Yesterday", timestamp: Date.now() - 86400000 },
 ];
+
+const DEFAULT_PAYMENTS: Payment[] = [];
 
 // ── Generic hook ──
 function useLocalStore<T extends { id: string }>(key: string, defaults: T[]) {
@@ -104,4 +119,8 @@ export function useCustomers() {
 
 export function useSales() {
   return useLocalStore<Sale>("umiya_sales", DEFAULT_SALES);
+}
+
+export function usePayments() {
+  return useLocalStore<Payment>("umiya_payments", DEFAULT_PAYMENTS);
 }

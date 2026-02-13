@@ -2,15 +2,17 @@ import { useState, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X, Search, Plus, Minus, Trash2, ArrowRight, ArrowLeft,
-  FileText, Send, CheckCircle, Percent, ShoppingBag, Zap, ScanBarcode
+  FileText, Send, CheckCircle, Percent, ShoppingBag, Zap, ScanBarcode, Download, IndianRupee
 } from "lucide-react";
-import { useProducts, useSales, useCustomers, type Product } from "@/hooks/use-local-store";
+import { useProducts, useSales, useCustomers, usePayments, type Product } from "@/hooks/use-local-store";
 import { useI18n } from "@/hooks/use-i18n";
 import { VoiceInputButton } from "@/components/ui/VoiceInputButton";
+import { downloadInvoicePDF } from "@/lib/generate-invoice-pdf";
 
 const GST_RATE = 18;
 
 type CartItem = { id: string; name: string; sku: string; price: number; qty: number };
+type PaymentMode = "full" | "partial" | "udhaar";
 
 interface QuickBillModalProps {
   open: boolean;
@@ -22,6 +24,7 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
   const { items: catalog } = useProducts();
   const { add: addSale } = useSales();
   const { items: customers, add: addCustomer, update: updateCustomer } = useCustomers();
+  const { add: addPayment } = usePayments();
   const barcodeRef = useRef<HTMLInputElement>(null);
   const [barcodeValue, setBarcodeValue] = useState("");
   const [barcodeFeedback, setBarcodeFeedback] = useState<"idle" | "found" | "notfound">("idle");
@@ -33,6 +36,8 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
   const [customerPhone, setCustomerPhone] = useState("");
   const [gstEnabled, setGstEnabled] = useState(true);
   const [billDone, setBillDone] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>("full");
+  const [partialAmount, setPartialAmount] = useState("");
 
   const filteredProducts = useMemo(() => {
     const q = search.toLowerCase();
@@ -44,6 +49,16 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
   const subtotal = useMemo(() => cart.reduce((s, i) => s + i.price * i.qty, 0), [cart]);
   const gstAmount = gstEnabled ? Math.round(subtotal * GST_RATE / 100) : 0;
   const total = subtotal + gstAmount;
+
+  const paidAmount = useMemo(() => {
+    if (paymentMode === "full") return total;
+    if (paymentMode === "udhaar") return 0;
+    return Math.min(Number(partialAmount) || 0, total);
+  }, [paymentMode, partialAmount, total]);
+
+  const remaining = total - paidAmount;
+
+  const paymentStatus: "Paid" | "Partial" | "Pending" = paymentMode === "full" ? "Paid" : paymentMode === "udhaar" ? "Pending" : (paidAmount > 0 ? "Partial" : "Pending");
 
   const addToCart = useCallback((product: Product) => {
     setCart((prev) => {
@@ -79,9 +94,32 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
 
   const invoiceId = useMemo(() => `INV-${Date.now().toString(36).toUpperCase().slice(-6)}`, [billDone]);
 
+  const getInvoiceData = () => ({
+    invoiceId,
+    date: new Date().toLocaleDateString("en-IN"),
+    customerName: customerName || "Walk-in",
+    customerPhone,
+    items: cart.map((i) => ({ name: i.name, qty: i.qty, price: i.price })),
+    subtotal,
+    gstRate: gstEnabled ? GST_RATE : 0,
+    gstAmount,
+    total,
+    paidAmount,
+    status: paymentStatus,
+  });
+
   const generateWhatsAppMsg = () => {
     const items = cart.map((i) => `• ${i.name} x${i.qty} — ₹${(i.price * i.qty).toLocaleString("en-IN")}`).join("\n");
-    const msg = `🧾 *Shree Umiya Electronics*\nInvoice: ${invoiceId}\n\nCustomer: ${customerName || "Walk-in"}\n\n${items}\n\nSubtotal: ₹${subtotal.toLocaleString("en-IN")}${gstEnabled ? `\nGST (${GST_RATE}%): ₹${gstAmount.toLocaleString("en-IN")}` : ""}\n*Total: ₹${total.toLocaleString("en-IN")}*\n\nThank you for choosing Umiya Electronics! 🙏`;
+    let msg = `🧾 *Shree Umiya Electronics*\nInvoice: ${invoiceId}\n\nCustomer: ${customerName || "Walk-in"}\n\n${items}\n\nSubtotal: ₹${subtotal.toLocaleString("en-IN")}${gstEnabled ? `\nGST (${GST_RATE}%): ₹${gstAmount.toLocaleString("en-IN")}` : ""}\n*Total: ₹${total.toLocaleString("en-IN")}*`;
+
+    if (remaining > 0) {
+      msg += `\n\n💰 Paid: ₹${paidAmount.toLocaleString("en-IN")}\n⚠️ *Balance Due: ₹${remaining.toLocaleString("en-IN")}*`;
+      msg += `\n\nPlease clear the dues at your earliest convenience. 🙏`;
+    } else {
+      msg += `\n\n✅ *Payment: FULLY PAID*`;
+    }
+
+    msg += `\n\nThank you for choosing Umiya Electronics! 🙏`;
     return encodeURIComponent(msg);
   };
 
@@ -93,8 +131,11 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
     window.open(url, "_blank");
   };
 
+  const handleDownloadPDF = () => {
+    downloadInvoicePDF(getInvoiceData());
+  };
+
   const handleDone = () => {
-    // Persist sale
     const itemNames = cart.map((i) => i.name).join(", ");
     addSale({
       id: invoiceId,
@@ -102,12 +143,25 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
       customerPhone: customerPhone,
       items: itemNames,
       amount: total,
-      status: "Paid",
+      paidAmount,
+      status: paymentStatus,
       date: "Just now",
       timestamp: Date.now(),
     });
 
-    // Update or create customer
+    // Record payment if any
+    if (paidAmount > 0) {
+      addPayment({
+        id: `PAY-${Date.now().toString(36).toUpperCase()}`,
+        saleId: invoiceId,
+        customer: customerName || "Walk-in",
+        amount: paidAmount,
+        timestamp: Date.now(),
+        method: "Cash",
+      });
+    }
+
+    // Update or create customer with balance
     if (customerName) {
       const existing = customers.find(
         (c) => c.phone === customerPhone || c.name.toLowerCase() === customerName.toLowerCase()
@@ -115,6 +169,7 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
       if (existing) {
         updateCustomer(existing.id, {
           purchases: existing.purchases + 1,
+          balance: existing.balance + remaining,
           lastVisit: "Just now",
         });
       } else {
@@ -122,7 +177,7 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
           id: `c${Date.now()}`,
           name: customerName,
           phone: customerPhone || "",
-          balance: 0,
+          balance: remaining,
           purchases: 1,
           lastVisit: "Just now",
         });
@@ -136,6 +191,8 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
       setCart([]);
       setCustomerName("");
       setCustomerPhone("");
+      setPaymentMode("full");
+      setPartialAmount("");
       onClose();
     }, 2000);
   };
@@ -146,6 +203,8 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
     setSearch("");
     setCustomerName("");
     setCustomerPhone("");
+    setPaymentMode("full");
+    setPartialAmount("");
     onClose();
   };
 
@@ -214,6 +273,9 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
                 <CheckCircle className="h-20 w-20 text-brand-success mb-4" />
               </motion.div>
               <p className="text-xl font-bold text-foreground">{t("bill.billCreated")} ✅</p>
+              {remaining > 0 && (
+                <p className="text-sm text-brand-warning mt-2">Udhaar: ₹{remaining.toLocaleString("en-IN")}</p>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -381,6 +443,55 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
                     </div>
                   </div>
                 </div>
+
+                {/* Payment Mode Selection */}
+                <div className="glass rounded-xl p-4 space-y-3">
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <IndianRupee className="h-3.5 w-3.5" /> Payment Mode
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([
+                      { mode: "full" as const, label: "Full Pay", emoji: "✅" },
+                      { mode: "partial" as const, label: "Partial", emoji: "💰" },
+                      { mode: "udhaar" as const, label: "Udhaar", emoji: "📝" },
+                    ]).map((pm) => (
+                      <button
+                        key={pm.mode}
+                        onClick={() => setPaymentMode(pm.mode)}
+                        className={`h-11 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                          paymentMode === pm.mode
+                            ? "gradient-accent text-accent-foreground glow-accent"
+                            : "glass text-foreground hover:bg-card/80"
+                        }`}
+                      >
+                        {pm.emoji} {pm.label}
+                      </button>
+                    ))}
+                  </div>
+                  {paymentMode === "partial" && (
+                    <div>
+                      <label className="text-[10px] text-muted-foreground mb-1 block">Amount received now</label>
+                      <input
+                        value={partialAmount}
+                        onChange={(e) => setPartialAmount(e.target.value.replace(/[^0-9]/g, ""))}
+                        className="w-full h-11 px-4 rounded-xl glass text-sm text-foreground placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-primary/30 outline-none"
+                        placeholder={`Max ₹${total.toLocaleString("en-IN")}`}
+                        inputMode="numeric"
+                        autoFocus
+                      />
+                      {paidAmount > 0 && (
+                        <p className="text-[10px] text-brand-warning mt-1.5">
+                          Balance (Udhaar): ₹{remaining.toLocaleString("en-IN")}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {paymentMode === "udhaar" && (
+                    <p className="text-xs text-brand-warning bg-brand-warning/10 rounded-lg px-3 py-2 border border-brand-warning/20">
+                      📝 Full amount ₹{total.toLocaleString("en-IN")} will be added as Udhaar (credit)
+                    </p>
+                  )}
+                </div>
               </motion.div>
             )}
 
@@ -425,22 +536,51 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
                       <span className="text-gradient-accent">₹{total.toLocaleString("en-IN")}</span>
                     </div>
                   </div>
+
+                  {/* Payment summary */}
+                  <div className="border-t border-border/50 pt-3 space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Paid</span>
+                      <span className="font-semibold text-brand-success">₹{paidAmount.toLocaleString("en-IN")}</span>
+                    </div>
+                    {remaining > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-brand-warning font-semibold">Balance Due (Udhaar)</span>
+                        <span className="font-bold text-brand-warning">₹{remaining.toLocaleString("en-IN")}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-xs mt-1">
+                      <span className="text-muted-foreground">Status</span>
+                      <span className={`font-bold px-2 py-0.5 rounded-full text-[10px] ${
+                        paymentStatus === "Paid" ? "bg-brand-success/10 text-brand-success" :
+                        paymentStatus === "Partial" ? "bg-brand-warning/10 text-brand-warning" :
+                        "bg-destructive/10 text-destructive"
+                      }`}>{paymentStatus}</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-2">
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleDownloadPDF}
+                    className="h-12 rounded-xl gradient-primary text-primary-foreground font-bold text-xs flex items-center justify-center gap-1.5 hover:brightness-110 transition-all"
+                  >
+                    <Download className="h-4 w-4" /> PDF
+                  </motion.button>
                   <motion.button
                     whileTap={{ scale: 0.95 }}
                     onClick={shareWhatsApp}
-                    className="h-12 rounded-xl bg-[hsl(142,70%,40%)] text-primary-foreground font-bold text-sm flex items-center justify-center gap-2 hover:brightness-110 transition-all"
+                    className="h-12 rounded-xl bg-[hsl(142,70%,40%)] text-primary-foreground font-bold text-xs flex items-center justify-center gap-1.5 hover:brightness-110 transition-all"
                   >
                     <Send className="h-4 w-4" /> WhatsApp
                   </motion.button>
                   <motion.button
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => window.print()}
-                    className="h-12 rounded-xl gradient-primary text-primary-foreground font-bold text-sm flex items-center justify-center gap-2 hover:brightness-110 transition-all"
+                    onClick={() => { handleDownloadPDF(); shareWhatsApp(); }}
+                    className="h-12 rounded-xl glass text-foreground font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-card/80 transition-all border border-accent/20"
                   >
-                    <FileText className="h-4 w-4" /> {t("bill.printPdf")}
+                    <FileText className="h-4 w-4 text-accent" /> Both
                   </motion.button>
                 </div>
               </motion.div>
