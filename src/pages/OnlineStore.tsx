@@ -1,14 +1,18 @@
 import { useState } from "react";
 import { PageShell } from "@/components/layout/PageShell";
-import { Share2, MessageCircle, Eye, Plus, X, Check, ShoppingBag, Star, Phone } from "lucide-react";
+import { Share2, MessageCircle, Eye, Plus, X, ShoppingBag, Star, Phone } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import umiyaLogo from "@/assets/umiya-logo.png";
-import { useProducts } from "@/hooks/use-local-store";
+import { useProducts, useSales, useCustomers, type Product } from "@/hooks/use-local-store";
+import StoreCheckout from "@/components/payment/StoreCheckout";
+import type { PaymentResult } from "@/lib/payment-service";
 
 export default function OnlineStore() {
   const { items: products, update } = useProducts();
-  const [showAddProduct, setShowAddProduct] = useState(false);
+  const { add: addSale } = useSales();
+  const { add: addCustomer, items: customers, update: updateCustomer } = useCustomers();
   const [previewMode, setPreviewMode] = useState(false);
+  const [checkoutProduct, setCheckoutProduct] = useState<Product | null>(null);
 
   const storeProducts = products.filter((p) => p.storeVisible !== false);
 
@@ -17,11 +21,7 @@ export default function OnlineStore() {
   };
 
   const categoryEmojis: Record<string, string> = {
-    "RO": "💧",
-    "Washing Machine": "🫧",
-    "Geyser": "🔥",
-    "AC": "❄️",
-    "Chimney": "🌪️",
+    "RO": "💧", "Washing Machine": "🫧", "Geyser": "🔥", "AC": "❄️", "Chimney": "🌪️",
   };
 
   const shareStoreLink = () => {
@@ -31,18 +31,38 @@ export default function OnlineStore() {
     window.open(`https://wa.me/?text=${msg}`, "_blank");
   };
 
-  const orderOnWhatsApp = (product: typeof products[0]) => {
-    const msg = encodeURIComponent(
-      `Hi! I'm interested in:\n\n🛒 *${product.name}*\n💰 Price: ₹${product.price.toLocaleString("en-IN")}\nSKU: ${product.sku}\n\nPlease share details about availability and delivery. 🙏`
-    );
-    window.open(`https://wa.me/919999999999?text=${msg}`, "_blank");
-  };
-
-  const enquireOnWhatsApp = (product: typeof products[0]) => {
+  const enquireOnWhatsApp = (product: Product) => {
     const msg = encodeURIComponent(
       `Hi! I have a question about:\n\n❓ *${product.name}*\n💰 Listed Price: ₹${product.price.toLocaleString("en-IN")}\n\nPlease share more details. 🙏`
     );
     window.open(`https://wa.me/919999999999?text=${msg}`, "_blank");
+  };
+
+  const handleOrderComplete = (order: { product: Product; paymentResult: PaymentResult; customerName: string; customerPhone: string }) => {
+    const gst = Math.round(order.product.price * 0.18);
+    const total = order.product.price + gst;
+
+    addSale({
+      id: `STORE-${Date.now().toString(36).toUpperCase().slice(-6)}`,
+      customer: order.customerName,
+      customerPhone: order.customerPhone,
+      items: order.product.name,
+      amount: total,
+      paidAmount: total,
+      status: "Paid",
+      date: "Just now",
+      timestamp: Date.now(),
+    });
+
+    // Update or create customer
+    const existing = customers.find((c) => c.phone === order.customerPhone || c.name.toLowerCase() === order.customerName.toLowerCase());
+    if (existing) {
+      updateCustomer(existing.id, { purchases: existing.purchases + 1, lastVisit: "Just now" });
+    } else {
+      addCustomer({ id: `c${Date.now()}`, name: order.customerName, phone: order.customerPhone, balance: 0, purchases: 1, lastVisit: "Just now" });
+    }
+
+    setCheckoutProduct(null);
   };
 
   return (
@@ -67,7 +87,7 @@ export default function OnlineStore() {
             <button onClick={shareStoreLink} className="h-10 gradient-accent text-accent-foreground rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 hover:brightness-110 transition-all">
               <Share2 className="h-4 w-4" /> Share
             </button>
-            <button onClick={() => setShowAddProduct(true)} className="h-10 glass text-foreground rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 hover:bg-card/70 transition-colors border border-accent/20">
+            <button className="h-10 glass text-foreground rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 hover:bg-card/70 transition-colors border border-accent/20">
               <Plus className="h-4 w-4 text-accent" /> Add
             </button>
           </div>
@@ -96,31 +116,19 @@ export default function OnlineStore() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             {storeProducts.map((p) => (
-              <motion.div
-                key={p.id}
-                layout
-                className="glass rounded-2xl overflow-hidden hover:bg-card/70 transition-colors group"
-              >
-                {/* Product image placeholder */}
+              <motion.div key={p.id} layout className="glass rounded-2xl overflow-hidden hover:bg-card/70 transition-colors group">
                 <div className="h-28 bg-gradient-to-br from-primary/5 to-accent/5 flex items-center justify-center relative">
                   <span className="text-4xl group-hover:scale-110 transition-transform">
                     {categoryEmojis[p.category] || "📦"}
                   </span>
                   {p.stock < 5 && p.stock > 0 && (
-                    <span className="absolute top-2 right-2 text-[8px] font-bold bg-brand-warning/20 text-brand-warning px-1.5 py-0.5 rounded-full">
-                      {p.stock} left
-                    </span>
+                    <span className="absolute top-2 right-2 text-[8px] font-bold bg-brand-warning/20 text-brand-warning px-1.5 py-0.5 rounded-full">{p.stock} left</span>
                   )}
                   {p.stock === 0 && (
-                    <span className="absolute top-2 right-2 text-[8px] font-bold bg-destructive/20 text-destructive px-1.5 py-0.5 rounded-full">
-                      Out of stock
-                    </span>
+                    <span className="absolute top-2 right-2 text-[8px] font-bold bg-destructive/20 text-destructive px-1.5 py-0.5 rounded-full">Out of stock</span>
                   )}
                   {!previewMode && (
-                    <button
-                      onClick={() => toggleVisibility(p.id, false)}
-                      className="absolute top-2 left-2 h-6 w-6 rounded-full glass flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
+                    <button onClick={() => toggleVisibility(p.id, false)} className="absolute top-2 left-2 h-6 w-6 rounded-full glass flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                       <X className="h-3 w-3 text-muted-foreground" />
                     </button>
                   )}
@@ -133,8 +141,9 @@ export default function OnlineStore() {
 
                   <div className="space-y-1.5">
                     <button
-                      onClick={() => orderOnWhatsApp(p)}
-                      className="w-full h-8 bg-brand-success/10 border border-brand-success/20 text-brand-success rounded-xl text-[11px] font-medium flex items-center justify-center gap-1 hover:bg-brand-success/15 transition-colors"
+                      onClick={() => setCheckoutProduct(p)}
+                      disabled={p.stock === 0}
+                      className="w-full h-8 gradient-accent text-accent-foreground rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 hover:brightness-110 transition-all disabled:opacity-40 disabled:pointer-events-none glow-accent"
                     >
                       <ShoppingBag className="h-3 w-3" /> Buy Now
                     </button>
@@ -162,10 +171,7 @@ export default function OnlineStore() {
                     <p className="text-xs font-semibold text-foreground">{p.name}</p>
                     <p className="text-[10px] text-muted-foreground">₹{p.price.toLocaleString("en-IN")}</p>
                   </div>
-                  <button
-                    onClick={() => toggleVisibility(p.id, true)}
-                    className="h-8 px-3 rounded-lg glass text-xs font-medium text-primary flex items-center gap-1 hover:bg-primary/10 transition-colors"
-                  >
+                  <button onClick={() => toggleVisibility(p.id, true)} className="h-8 px-3 rounded-lg glass text-xs font-medium text-primary flex items-center gap-1 hover:bg-primary/10 transition-colors">
                     <Eye className="h-3 w-3" /> Show
                   </button>
                 </div>
@@ -180,14 +186,23 @@ export default function OnlineStore() {
             {[1,2,3,4,5].map((i) => <Star key={i} className="h-4 w-4 text-brand-warning fill-brand-warning" />)}
           </div>
           <p className="text-xs text-muted-foreground">4.8★ rated • 20,000+ problems solved since 2005</p>
-          <a
-            href="tel:+919999999999"
-            className="inline-flex items-center gap-2 gradient-accent text-accent-foreground font-bold py-3 px-6 rounded-xl text-sm hover:brightness-110 transition-all glow-accent"
-          >
+          <a href="tel:+919999999999" className="inline-flex items-center gap-2 gradient-accent text-accent-foreground font-bold py-3 px-6 rounded-xl text-sm hover:brightness-110 transition-all glow-accent">
             <Phone className="h-4 w-4" /> Call for Service
           </a>
         </div>
       </div>
+
+      {/* Store Checkout Modal */}
+      <AnimatePresence>
+        {checkoutProduct && (
+          <StoreCheckout
+            open={!!checkoutProduct}
+            onClose={() => setCheckoutProduct(null)}
+            product={checkoutProduct}
+            onOrderComplete={handleOrderComplete}
+          />
+        )}
+      </AnimatePresence>
     </PageShell>
   );
 }
