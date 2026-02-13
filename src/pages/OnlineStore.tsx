@@ -1,28 +1,32 @@
 import { useState } from "react";
 import { PageShell } from "@/components/layout/PageShell";
-import { Share2, MessageCircle, Eye, Plus, X, ShoppingBag, Star, Phone } from "lucide-react";
+import { Share2, MessageCircle, Eye, Plus, X, ShoppingBag, Star, Phone, Wrench } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import umiyaLogo from "@/assets/umiya-logo.png";
-import { useProducts, useSales, useCustomers, type Product } from "@/hooks/use-offline-store";
+import { useProducts, useSales, useCustomers, useStoreProfile, type Product } from "@/hooks/use-offline-store";
 import StoreCheckout from "@/components/payment/StoreCheckout";
 import type { PaymentResult } from "@/lib/payment-service";
+import { StoreProfileEditor } from "@/components/store/StoreProfileEditor";
 
 export default function OnlineStore() {
   const { items: products, update } = useProducts();
   const { add: addSale } = useSales();
   const { add: addCustomer, items: customers, update: updateCustomer } = useCustomers();
+  const { profile } = useStoreProfile();
   const [previewMode, setPreviewMode] = useState(false);
   const [checkoutProduct, setCheckoutProduct] = useState<Product | null>(null);
 
-  const storeProducts = products.filter((p) => p.storeVisible !== false);
+  const storeProducts = products.filter((p) => p.visibility === "online" || p.visibility === "both" || p.storeVisible !== false);
 
   const toggleVisibility = (id: string, visible: boolean) => {
-    update(id, { storeVisible: visible });
+    update(id, { visibility: visible ? "both" : "offline" });
   };
 
   const categoryEmojis: Record<string, string> = {
     "RO": "💧", "Washing Machine": "🫧", "Geyser": "🔥", "AC": "❄️", "Chimney": "🌪️",
   };
+
+  const isServiceCategory = (cat: string) => ["RO", "AC", "Geyser", "Washing Machine", "Chimney"].includes(cat);
 
   const shareStoreLink = () => {
     const msg = encodeURIComponent(
@@ -93,6 +97,9 @@ export default function OnlineStore() {
           </div>
         </div>
 
+        {/* Store Profile Editor */}
+        <StoreProfileEditor />
+
         {/* Store Stats */}
         <div className="grid grid-cols-3 gap-3">
           <div className="glass rounded-2xl p-3 text-center">
@@ -117,10 +124,14 @@ export default function OnlineStore() {
           <div className="grid grid-cols-2 gap-3">
             {storeProducts.map((p) => (
               <motion.div key={p.id} layout className="glass rounded-2xl overflow-hidden hover:bg-card/70 transition-colors group">
-                <div className="h-28 bg-gradient-to-br from-primary/5 to-accent/5 flex items-center justify-center relative">
-                  <span className="text-4xl group-hover:scale-110 transition-transform">
-                    {categoryEmojis[p.category] || "📦"}
-                  </span>
+                <div className="h-28 bg-gradient-to-br from-primary/5 to-accent/5 flex items-center justify-center relative overflow-hidden">
+                  {(p.coverImage || (p.images.length > 0 ? p.images[0] : null)) ? (
+                    <img src={p.coverImage || p.images[0]} alt="" className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
+                  ) : (
+                    <span className="text-4xl group-hover:scale-110 transition-transform">
+                      {categoryEmojis[p.category] || "📦"}
+                    </span>
+                  )}
                   {p.stock < 5 && p.stock > 0 && (
                     <span className="absolute top-2 right-2 text-[8px] font-bold bg-brand-warning/20 text-brand-warning px-1.5 py-0.5 rounded-full">{p.stock} left</span>
                   )}
@@ -128,7 +139,7 @@ export default function OnlineStore() {
                     <span className="absolute top-2 right-2 text-[8px] font-bold bg-destructive/20 text-destructive px-1.5 py-0.5 rounded-full">Out of stock</span>
                   )}
                   {!previewMode && (
-                    <button onClick={() => toggleVisibility(p.id, false)} className="absolute top-2 left-2 h-6 w-6 rounded-full glass flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={(e) => { e.stopPropagation(); toggleVisibility(p.id, false); }} className="absolute top-2 left-2 h-6 w-6 rounded-full glass flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                       <X className="h-3 w-3 text-muted-foreground" />
                     </button>
                   )}
@@ -153,6 +164,14 @@ export default function OnlineStore() {
                     >
                       <MessageCircle className="h-3 w-3" /> Enquire
                     </button>
+                    {isServiceCategory(p.category) && (
+                      <button
+                        onClick={() => enquireOnWhatsApp(p)}
+                        className="w-full h-7 glass text-primary rounded-lg text-[10px] font-medium flex items-center justify-center gap-1 hover:bg-primary/10 transition-colors border border-primary/20"
+                      >
+                        <Wrench className="h-3 w-3" /> Book Installation
+                      </button>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -161,11 +180,11 @@ export default function OnlineStore() {
         </div>
 
         {/* Hidden products (edit mode only) */}
-        {!previewMode && products.filter((p) => p.storeVisible === false).length > 0 && (
+        {!previewMode && products.filter((p) => p.visibility === "offline").length > 0 && (
           <div>
             <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-[0.15em] mb-3">Hidden Products</h4>
             <div className="space-y-2">
-              {products.filter((p) => p.storeVisible === false).map((p) => (
+              {products.filter((p) => p.visibility === "offline").map((p) => (
                 <div key={p.id} className="glass rounded-xl p-3 flex items-center justify-between opacity-60">
                   <div>
                     <p className="text-xs font-semibold text-foreground">{p.name}</p>

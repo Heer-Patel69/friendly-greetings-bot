@@ -35,7 +35,7 @@ function parseVoiceInput(text: string, catalog: Product[]) {
 
 export default function POS() {
   const navigate = useNavigate();
-  const { items: products } = useProducts();
+  const { items: products, update: updateProduct } = useProducts();
   const { items: customers, update: updateCustomer } = useCustomers();
   const { add: addSale } = useSales();
   const { add: addPayment } = usePayments();
@@ -126,7 +126,17 @@ export default function POS() {
 
     await addSale(sale);
 
-    // Record payment if paid
+    // Decrement stock for each cart item
+    for (const item of cart) {
+      const product = products.find((p) => p.id === item.id);
+      if (product) {
+        const newStock = Math.max(0, product.stock - item.qty);
+        await updateProduct(product.id, { stock: newStock });
+        if (newStock <= (product.reorderLevel ?? 5)) {
+          toast.warning(`Low stock: ${product.name} (${newStock} left)`);
+        }
+      }
+    }
     if (data.paidAmount > 0) {
       await addPayment({
         id: `pay-${Date.now()}`,
