@@ -1,17 +1,29 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { PageShell } from "@/components/layout/PageShell";
 import { ShoppingCart, FileText, Zap, Search, IndianRupee } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import QuickBillModal from "@/components/billing/QuickBillModal";
-
-const recentSales = [
-  { id: "INV-001", customer: "Rajesh Patel", items: "RO Service", amount: "₹1,500", time: "2h ago", status: "Paid" },
-  { id: "INV-002", customer: "Meena Shah", items: "Washing Machine Repair", amount: "₹2,800", time: "4h ago", status: "Paid" },
-  { id: "INV-003", customer: "Amit Kumar", items: "Geyser Installation", amount: "₹4,500", time: "Yesterday", status: "Pending" },
-];
+import { useSales } from "@/hooks/use-local-store";
 
 export default function Sales() {
   const [billOpen, setBillOpen] = useState(false);
+  const { items: sales } = useSales();
+
+  const todayTotal = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    return sales
+      .filter((s) => s.timestamp >= todayStart.getTime())
+      .reduce((sum, s) => sum + s.amount, 0);
+  }, [sales]);
+
+  const todayCount = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    return sales.filter((s) => s.timestamp >= todayStart.getTime()).length;
+  }, [sales]);
+
+  const avgSale = sales.length > 0 ? Math.round(sales.reduce((s, i) => s + i.amount, 0) / sales.length) : 0;
 
   return (
     <PageShell title="Sales & Billing" subtitle="तेज़ बिल बनाएं">
@@ -27,9 +39,9 @@ export default function Sales() {
 
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: "Today Sales", value: "₹12,450", icon: ShoppingCart },
-            { label: "Invoices", value: "8", icon: FileText },
-            { label: "Avg Sale", value: "₹1,556", icon: IndianRupee },
+            { label: "Today Sales", value: `₹${todayTotal.toLocaleString("en-IN")}`, icon: ShoppingCart },
+            { label: "Invoices", value: String(sales.length), icon: FileText },
+            { label: "Avg Sale", value: `₹${avgSale.toLocaleString("en-IN")}`, icon: IndianRupee },
           ].map((s) => (
             <div key={s.label} className="glass rounded-2xl p-3 text-center">
               <s.icon className="h-4 w-4 text-primary mx-auto mb-1.5" />
@@ -39,14 +51,9 @@ export default function Sales() {
           ))}
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input className="w-full h-12 pl-10 pr-4 rounded-2xl glass text-sm text-foreground placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-primary/30 outline-none transition-shadow" placeholder="Search invoices..." />
-        </div>
-
         <div className="space-y-2">
           <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-[0.15em] px-1">Recent Invoices</h4>
-          {recentSales.map((sale) => (
+          {sales.slice(0, 20).map((sale) => (
             <div key={sale.id} className="glass rounded-2xl p-4 flex items-center justify-between hover:bg-card/70 transition-colors">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl gradient-card border border-primary/20 flex items-center justify-center text-primary font-bold text-sm">
@@ -58,7 +65,7 @@ export default function Sales() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm font-bold text-foreground">{sale.amount}</p>
+                <p className="text-sm font-bold text-foreground">₹{sale.amount.toLocaleString("en-IN")}</p>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                   sale.status === "Paid" ? "bg-brand-success/10 text-brand-success border-brand-success/20" : "bg-brand-warning/10 text-brand-warning border-brand-warning/20"
                 }`}>{sale.status}</span>
