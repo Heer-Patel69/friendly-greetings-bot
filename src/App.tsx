@@ -7,6 +7,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Sales from "./pages/Sales";
+import POS from "./pages/POS";
 import Inventory from "./pages/Inventory";
 import Reports from "./pages/Reports";
 import Customers from "./pages/Customers";
@@ -31,7 +32,7 @@ const App = () => (
           {/* Marketing website — standalone */}
           <Route path="/" element={<Index />} />
           <Route path="/stores" element={<Stores />} />
-
+          <Route path="/pos" element={<POS />} />
           {/* Business app — with sidebar/bottom nav */}
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />

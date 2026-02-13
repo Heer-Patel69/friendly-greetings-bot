@@ -70,7 +70,7 @@ export default function Dashboard() {
   ];
 
   const quickActions = [
-    { icon: Zap, label: t("dash.quickSell"), sublabel: t("sales.subtitle"), to: "/sales", gradient: "gradient-accent glow-accent" },
+    { icon: Zap, label: t("dash.quickSell"), sublabel: t("sales.subtitle"), to: "/pos", gradient: "gradient-accent glow-accent" },
     { icon: Package, label: t("dash.addStock"), sublabel: t("inv.subtitle"), to: "/purchase", gradient: "gradient-primary glow-primary" },
     { icon: Users, label: t("nav.customers"), sublabel: t("cust.subtitle"), to: "/customers", gradient: "bg-brand-success" },
     { icon: BarChart3, label: t("nav.reports"), sublabel: t("dash.details"), to: "/reports", gradient: "bg-brand-info" },

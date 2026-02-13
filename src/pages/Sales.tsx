@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { PageShell } from "@/components/layout/PageShell";
 import { ShoppingCart, FileText, Zap, IndianRupee, CreditCard, Link2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import QuickBillModal from "@/components/billing/QuickBillModal";
 import PaymentModal from "@/components/payment/PaymentModal";
 import PaymentStatusBadge from "@/components/payment/PaymentStatusBadge";
 import { useSales } from "@/hooks/use-offline-store";
@@ -10,7 +10,7 @@ import { useI18n } from "@/hooks/use-i18n";
 import type { Sale } from "@/hooks/use-offline-store";
 
 export default function Sales() {
-  const [billOpen, setBillOpen] = useState(false);
+  const navigate = useNavigate();
   const { items: sales, update } = useSales();
   const { t } = useI18n();
 
@@ -42,7 +42,7 @@ export default function Sales() {
         <motion.button
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
-          onClick={() => setBillOpen(true)}
+          onClick={() => navigate("/pos")}
           className="w-full gradient-accent text-accent-foreground font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform glow-accent"
         >
           <Zap className="h-5 w-5" /> {t("sales.quickSellBtn")}
@@ -112,9 +112,8 @@ export default function Sales() {
         </div>
       </div>
 
-      <AnimatePresence>
-        {billOpen && <QuickBillModal open={billOpen} onClose={() => setBillOpen(false)} />}
-      </AnimatePresence>
+
+
 
       <AnimatePresence>
         {paymentTarget && (
