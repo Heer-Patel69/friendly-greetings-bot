@@ -1,248 +1,232 @@
 
 
-# Phase 3: Inventory Engine + Online Mini-Store Enhancement
+# Phase 4: PDF Invoice Storage & Razorpay Integration Engine
 
-Two feature upgrades that extend the existing Product and Store systems into production-grade, multi-image, supplier-aware inventory management and a public-facing store directory with real product catalogs.
+Upgrades the existing invoice PDF generator and payment service from simulation mode into a production-grade system with persistent PDF storage, invoice download/resend capabilities, and Razorpay-ready payment link auto-creation with webhook handling.
 
 ---
 
 ## What Changes
 
-### 1. Inventory Engine (Enhanced Product Management)
+### 1. Enhanced PDF Generator (generate-invoice-pdf.ts)
 
-The current `Inventory.tsx` has basic add/list with name, SKU, price, category, stock. We upgrade it to a full product management system:
+The current generator is already accounting-grade with logo, GST breakdown, QR code, and payment link embedding. Enhancements:
 
-**Data model additions to `Product` type:**
+- **Per-item GST support**: Use each product's individual `gst` field instead of a flat 18% rate across all items. The summary section will show grouped GST breakdowns (e.g., "CGST 9% + SGST 9%").
+- **HSN column**: Add HSN/SAC code column to the items table (pulled from product SKU or a new optional field).
+- **Store profile integration**: Pull logo image, store name, address, GSTIN, and phone from `StoreProfile` in IndexedDB instead of hardcoded values.
+- **PDF metadata**: Embed `pdf_generated_at` timestamp in the document properties.
+
+### 2. Invoice PDF Storage & Resend (New System)
+
+Currently, `downloadInvoicePDF()` generates and immediately triggers a browser download. There is no persistence -- the PDF is lost after download. New flow:
+
+**Schema additions to `Sale` type:**
 ```
-barcode?: string
-images: string[]         (base64 data URLs stored locally — no cloud needed yet)
-coverImage?: string      (index into images array or URL)
-cost?: number            (buy price for profit tracking)
-gst?: number             (product-level GST %, default 18)
-reorderLevel?: number    (triggers low-stock alert)
-supplierId?: string      (links to supplier)
-visibility?: "online" | "offline" | "both"  (replaces storeVisible boolean)
-```
-
-**New `Supplier` type + table in IndexedDB:**
-```
-Supplier { id, name, phone, email, company, notes }
-```
-
-**Enhanced Inventory page features:**
-- Filter bar: "All" | "Low Stock" | "Online" | "Offline" chips
-- Product cards show thumbnail image (first from images array) instead of generic icon
-- Tap product card to open detail view (slide-up sheet)
-- Product detail: image carousel at top, stock badge, edit form, transaction history (sales referencing this SKU)
-- "Reorder from Supplier" button that opens WhatsApp with templated message
-
-**Enhanced Add/Edit Product form:**
-- Multi-image upload: file input accepting multiple images, stored as base64 data URLs in IndexedDB
-- Image preview carousel with cover image selection (tap to set cover)
-- Barcode field with scan button
-- Cost price + Sale price + GST % fields
-- Reorder level field
-- Supplier dropdown (from suppliers table)
-- Visibility toggle: Online / Offline / Both
-
-**Stock auto-decrement:**
-- When a sale is created in POS, decrement `stock` for each cart item
-- If stock falls below `reorderLevel`, show toast alert
-
-**CSV Import (basic v1):**
-- Button to upload CSV file
-- Parse CSV with headers: name, sku, price, cost, stock, category, gst
-- Preview parsed rows in a table
-- Confirm to bulk-insert into products table
-
-### 2. Online Mini-Store + Store Directory Enhancement
-
-The current `OnlineStore.tsx` shows products with emoji placeholders and basic Buy Now / Enquire flow. The current `Stores.tsx` uses hardcoded mock data. We upgrade both:
-
-**Store Profile model (new fields on a config object stored in IndexedDB):**
-```
-StoreProfile { id, name, slug, logo, description, address, city, categories, isOpen, phone, whatsapp }
-```
-New `storeProfile` table in IndexedDB (single-row config).
-
-**Online Store page enhancements:**
-- Product cards show actual product images (from `images` array) instead of emoji placeholders
-- Image carousel on product detail view
-- "Book Installation" button for service-category products
-- Cover image displayed as card thumbnail
-- Stock badge with real-time quantity
-- Visibility filter respects new `visibility` field
-
-**Store profile editor (in Online Store page):**
-- Edit store name, description, address, city
-- Upload store logo
-- Set open/closed status
-- Configure WhatsApp number for enquiries
-
-**Stores directory (`/stores`) enhancements:**
-- Pull store data from IndexedDB `storeProfile` (own store always shown)
-- Mock stores remain as fallback/demo data
-- Store profile cards show logo image if available
-- Product listings under each store show real images
-
-**Public store route `/store/:slug` (new page):**
-- Standalone public page (no sidebar) for a single store
-- Store header with logo, name, description, open/closed badge
-- Contact CTAs: Call, WhatsApp, Visit Store
-- Product grid with image carousels, price, stock badge
-- Buy Now and Enquire on WhatsApp buttons per product
-- Mobile-first responsive layout
-
-### 3. IndexedDB Schema v3 Migration
-
-Bump to version 3 to add `suppliers` and `storeProfile` tables and extend `products`:
-
-```
-this.version(3).stores({
-  products: "id, sku, category, name, barcode, supplierId",
-  customers: "id, phone, name",
-  sales: "id, customer, status, timestamp",
-  payments: "id, saleId, timestamp, customer",
-  jobCards: "id, status, createdAt, customerPhone",
-  syncQueue: "++id, table, synced, createdAt",
-  favorites: "id, productId, position",
-  suppliers: "id, name, phone",
-  storeProfile: "id",
-}).upgrade(tx => {
-  tx.table("products").toCollection().modify(p => {
-    p.images = p.images ?? [];
-    p.coverImage = p.coverImage ?? "";
-    p.cost = p.cost ?? 0;
-    p.gst = p.gst ?? 18;
-    p.reorderLevel = p.reorderLevel ?? 5;
-    p.supplierId = p.supplierId ?? "";
-    p.barcode = p.barcode ?? "";
-    p.visibility = p.storeVisible === false ? "offline" : "both";
-  });
-});
+pdfDataUrl?: string          // base64 PDF stored in IndexedDB
+pdfGeneratedAt?: number      // timestamp
+razorpayPaymentId?: string   // (already exists)
 ```
 
-### 4. New Files to Create
+**New flow after sale creation:**
+1. Generate PDF blob via `getInvoicePDFBlob()`
+2. Convert blob to base64 data URL
+3. Store data URL in the sale record's `pdfDataUrl` field
+4. Show toast with "Download" and "Send WhatsApp" actions
+5. For resend: retrieve `pdfDataUrl` from sale record, convert back to blob, trigger download or share
+
+**New utility functions in `generate-invoice-pdf.ts`:**
+- `generateAndStorePDF(data, saleId)` -- generates PDF, stores base64 in IndexedDB sale record, returns blob
+- `getStoredPDF(saleId)` -- retrieves stored PDF blob from sale record
+- `regeneratePDF(saleId)` -- regenerates PDF with updated data (e.g., after payment status change)
+
+**Sales page enhancements:**
+- Each invoice row gets "Download PDF" and "Resend WhatsApp" action buttons
+- Download pulls from stored `pdfDataUrl` (instant, no regeneration needed)
+- WhatsApp resend opens wa.me with templated message + prompts user to attach downloaded PDF
+
+### 3. Payment Link Auto-Creation on Invoice Save
+
+When an invoice with balance > 0 is saved (from POS or QuickBillModal), automatically create a payment link:
+
+**In POS.tsx `handlePaymentConfirm`:**
+1. After saving the sale, check if `balance > 0`
+2. Call `createPaymentLink()` from payment-service
+3. Store `paymentLink` (short URL) and `paymentLinkId` in the sale record
+4. Pass the payment link URL to the PDF generator for QR embedding
+5. Generate and store PDF with the real payment link
+
+**In QuickBillModal (already partially implemented):**
+- The modal already generates a simulated payment link URL -- wire it to actually call `createPaymentLink()` and update the sale record
+
+### 4. Razorpay Integration Architecture (Backend-Ready)
+
+The current `payment-service.ts` simulates all operations. We enhance it to be truly ready for Razorpay activation:
+
+**Updated payment-service.ts:**
+- Add `initializeRazorpay()` function that checks for Razorpay Checkout SDK script
+- Add `loadRazorpayCheckout()` that dynamically loads the Razorpay script tag
+- When `RAZORPAY_READY = true`:
+  - `processPayment()` opens real Razorpay Checkout modal
+  - `createPaymentLink()` calls edge function that proxies to Razorpay API
+  - `checkPaymentStatus()` calls edge function that queries Razorpay
+
+**Edge function stubs (for future Lovable Cloud activation):**
+- `create-payment-link`: POST to Razorpay Payment Links API
+- `razorpay-webhook`: Receives Razorpay webhook POSTs, verifies HMAC signature, updates sale status
+- `check-payment`: GET payment status from Razorpay
+
+**Webhook flow (documented, not yet active):**
+```
+Razorpay webhook POST -> Edge function -> Verify signature ->
+  If payment.captured: Update sale.paidAmount, sale.status = "Paid" ->
+    Regenerate PDF (remove QR section) -> Notify store owner
+  If payment_link.paid: Same flow
+  If payment.failed: Update sale with failure note
+```
+
+### 5. Invoice Actions in Sales & Customers Pages
+
+**Sales page (`Sales.tsx`) enhancements:**
+- Add "Download" button (PDF icon) to each invoice row
+- Add "Resend" button (WhatsApp icon) to each invoice row
+- Both work instantly from stored PDF data -- no regeneration delay
+
+**Customers page invoice tab:**
+- When viewing a customer's invoices, each invoice shows Download/Resend actions
+- "Send Reminder" button on unpaid invoices generates WhatsApp message with payment link
+
+**POS post-checkout flow:**
+- After payment confirm, show a success screen with 3 buttons: "Download PDF", "Send WhatsApp", "New Bill"
+- PDF is generated in background and stored before buttons become active
+
+---
+
+## New Files to Create
 
 | File | Purpose |
 |------|---------|
-| `src/components/inventory/ProductDetail.tsx` | Slide-up product detail with image carousel, edit form, transaction history |
-| `src/components/inventory/ImageUploader.tsx` | Multi-image picker with preview carousel and cover selection |
-| `src/components/inventory/CSVImport.tsx` | CSV file upload, parse, preview table, and bulk import |
-| `src/components/inventory/SupplierSelect.tsx` | Supplier dropdown with inline "Add new" option |
-| `src/components/store/StoreProfileEditor.tsx` | Edit store profile form (name, logo, description, city) |
-| `src/pages/PublicStore.tsx` | Public-facing store page at `/store/:slug` |
+| `src/lib/pdf-storage.ts` | Utility functions for storing/retrieving PDFs from IndexedDB sale records |
 
-### 5. Files to Modify
+## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/lib/offline-db.ts` | v3 schema, add Supplier + StoreProfile types, extend Product type |
-| `src/hooks/use-offline-store.ts` | Add `useSuppliers()` and `useStoreProfile()` hooks |
-| `src/pages/Inventory.tsx` | Major rewrite: filters, multi-image product form, product detail sheet, CSV import, supplier reorder |
-| `src/pages/OnlineStore.tsx` | Use real product images, store profile editor, visibility filter, Book Installation button |
-| `src/pages/Stores.tsx` | Integrate storeProfile data alongside mock stores |
-| `src/pages/POS.tsx` | Auto-decrement stock on sale confirmation, low-stock toast |
-| `src/App.tsx` | Add `/store/:slug` route |
-
-### 6. Edge Cases
-
-- **Large images in IndexedDB**: Resize images client-side before storing (max 800px width, JPEG compression at 0.7 quality) to prevent DB bloat
-- **CSV with duplicate SKUs**: Show warning row, skip or overwrite based on user choice
-- **Stock goes negative from offline conflicts**: Floor at 0, show warning badge
-- **No images uploaded**: Fall back to category emoji (existing behavior)
-- **Store profile not configured**: Show setup wizard on first visit to Online Store page
+| `src/lib/offline-db.ts` | Add `pdfDataUrl` and `pdfGeneratedAt` to Sale type |
+| `src/lib/generate-invoice-pdf.ts` | Add per-item GST, store profile integration, generateAndStorePDF function |
+| `src/lib/payment-service.ts` | Add Razorpay Checkout SDK loader, enhance with edge function call stubs |
+| `src/pages/POS.tsx` | Auto-create payment link on balance > 0, store PDF after checkout, enhanced post-checkout actions |
+| `src/pages/Sales.tsx` | Add Download PDF and Resend WhatsApp buttons per invoice row |
+| `src/pages/Customers.tsx` | Add Download/Resend on invoice tab entries |
+| `src/components/billing/QuickBillModal.tsx` | Wire payment link creation and PDF storage |
 
 ---
 
 ## Technical Details
 
-### Image Handling (Client-Side Only)
+### PDF Storage Strategy
 
-Since there's no cloud storage yet, images are stored as compressed base64 data URLs in IndexedDB. A utility function resizes and compresses:
+PDFs are stored as base64 data URLs in IndexedDB within the sale record. A typical invoice PDF is 30-80KB, which is safe for IndexedDB storage. For reference, IndexedDB can handle hundreds of MB.
 
 ```typescript
-async function compressImage(file: File, maxWidth = 800): Promise<string> {
+// pdf-storage.ts
+export async function storePDF(saleId: string, blob: Blob): Promise<string> {
   return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      const scale = Math.min(1, maxWidth / img.width);
-      canvas.width = img.width * scale;
-      canvas.height = img.height * scale;
-      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL("image/jpeg", 0.7));
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      await db.sales.update(saleId, { 
+        pdfDataUrl: dataUrl, 
+        pdfGeneratedAt: Date.now() 
+      });
+      resolve(dataUrl);
     };
-    img.src = URL.createObjectURL(file);
+    reader.readAsDataURL(blob);
+  });
+}
+
+export async function downloadStoredPDF(saleId: string): Promise<boolean> {
+  const sale = await db.sales.get(saleId);
+  if (!sale?.pdfDataUrl) return false;
+  const link = document.createElement("a");
+  link.href = sale.pdfDataUrl;
+  link.download = `${saleId}.pdf`;
+  link.click();
+  return true;
+}
+```
+
+### Payment Link Auto-Creation Flow
+
+```typescript
+// In POS.tsx handlePaymentConfirm, after saving sale:
+if (balance > 0 && data.customerPhone) {
+  const link = await createPaymentLink({
+    amount: balance,
+    description: `Balance for ${invoiceId}`,
+    customerName: data.customerName,
+    customerPhone: data.customerPhone,
+    invoiceId,
+  });
+  await updateSale(invoiceId, { 
+    paymentLink: link.shortUrl, 
+    paymentLinkId: link.id 
+  });
+  // Generate PDF with real payment link
+  const pdfBlob = await getInvoicePDFBlob({ ...invoiceData, paymentLink: link.shortUrl });
+  await storePDF(invoiceId, pdfBlob);
+}
+```
+
+### Razorpay Checkout SDK Loader
+
+```typescript
+export function loadRazorpayCheckout(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).Razorpay) { resolve(); return; }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Razorpay"));
+    document.head.appendChild(script);
   });
 }
 ```
 
-### Stock Decrement on Sale
-
-In `POS.tsx` `handlePaymentConfirm`, after saving the sale:
+### Per-Item GST in PDF
 
 ```typescript
-// Decrement stock for each cart item
-for (const item of cart) {
-  const product = products.find(p => p.id === item.id);
-  if (product) {
-    const newStock = Math.max(0, product.stock - item.qty);
-    await updateProduct(product.id, { stock: newStock });
-    if (newStock <= (product.reorderLevel ?? 5)) {
-      toast.warning(`Low stock: ${product.name} (${newStock} left)`);
-    }
-  }
-}
+// Enhanced items table with individual GST
+data.items.forEach((item) => {
+  const itemGst = item.gst ?? data.gstRate;
+  const gstAmt = Math.round(item.price * item.qty * itemGst / 100);
+  // Render: Name | Qty | Rate | GST% | GST Amt | Total
+});
+
+// Summary: Group by GST rate
+const gstGroups = groupBy(items, "gst");
+// Show: CGST 9%: X, SGST 9%: X for each rate
 ```
 
-### CSV Parser (simple v1)
+### Edge Cases Handled
 
-```typescript
-function parseCSV(text: string): Partial<Product>[] {
-  const lines = text.trim().split("\n");
-  const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
-  return lines.slice(1).map(line => {
-    const vals = line.split(",");
-    const row: any = {};
-    headers.forEach((h, i) => { row[h] = vals[i]?.trim(); });
-    return {
-      id: `csv-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
-      name: row.name || "",
-      sku: (row.sku || "").toUpperCase(),
-      price: Number(row.price) || 0,
-      cost: Number(row.cost) || 0,
-      stock: Number(row.stock) || 0,
-      category: row.category || "Other",
-      gst: Number(row.gst) || 18,
-      images: [],
-      reorderLevel: 5,
-    };
-  }).filter(p => p.name && p.sku);
-}
-```
+- **PDF generation fails on mobile**: Wrap in try/catch, show manual "Retry" button, sale is still saved without PDF
+- **Payment link creation fails offline**: Save sale without link, queue link creation for when online, mark with "Link pending" badge
+- **PDF too large**: Already using compressed images (max 800px, JPEG 0.7 quality from image-utils); invoice PDFs without embedded images stay under 100KB
+- **Razorpay script blocked by ad-blocker**: Detect load failure, fall back to payment link mode only
+- **Partial payment via Razorpay then customer pays more**: Update `paidAmount`, check if fully paid, regenerate PDF without QR if balance = 0
+- **Duplicate PDF generation**: Debounce -- check `pdfGeneratedAt` timestamp, skip if generated within last 5 seconds
 
-### Supplier WhatsApp Reorder
-
-```typescript
-function reorderFromSupplier(supplier: Supplier, product: Product) {
-  const msg = encodeURIComponent(
-    `🔄 Reorder Request\n\nProduct: ${product.name}\nSKU: ${product.sku}\nCurrent Stock: ${product.stock}\nSuggested Qty: ${Math.max(10, (product.reorderLevel ?? 5) * 3)}\n\n— Sent from DukaanOS`
-  );
-  window.open(`https://wa.me/${supplier.phone.replace(/\D/g, "")}?text=${msg}`, "_blank");
-}
-```
+---
 
 ## Build Order
 
-1. Update `offline-db.ts` -- schema v3, new types (Supplier, StoreProfile), extend Product
-2. Update `use-offline-store.ts` -- add `useSuppliers()`, `useStoreProfile()` hooks
-3. Create utility: `ImageUploader`, `CSVImport`, `SupplierSelect` components
-4. Create `ProductDetail` sheet component
-5. Rewrite `Inventory.tsx` with filters, enhanced form, product detail, CSV import
-6. Update `POS.tsx` with stock decrement + low-stock alerts
-7. Create `StoreProfileEditor` and `PublicStore.tsx`
-8. Update `OnlineStore.tsx` with real images and profile editor
-9. Update `Stores.tsx` to integrate real store profile
-10. Add `/store/:slug` route to `App.tsx`
+1. Add `pdfDataUrl` and `pdfGeneratedAt` to Sale type in `offline-db.ts`
+2. Create `pdf-storage.ts` utility (store, retrieve, download)
+3. Update `generate-invoice-pdf.ts` (per-item GST, store profile, generateAndStorePDF)
+4. Update `payment-service.ts` (Razorpay SDK loader, edge function stubs)
+5. Update `POS.tsx` (auto-create payment link, store PDF, enhanced post-checkout)
+6. Update `QuickBillModal.tsx` (wire payment link + PDF storage)
+7. Update `Sales.tsx` (Download/Resend buttons per invoice)
+8. Update `Customers.tsx` (Download/Resend on invoice tab)
 
