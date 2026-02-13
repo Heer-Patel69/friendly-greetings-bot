@@ -2,22 +2,9 @@ import { useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X, Search, Plus, Minus, Trash2, ArrowRight, ArrowLeft,
-  FileText, Send, CheckCircle, IndianRupee, Percent, ShoppingBag, Zap
+  FileText, Send, CheckCircle, Percent, ShoppingBag, Zap
 } from "lucide-react";
-
-// ── Product catalog (replace with DB later) ──
-const CATALOG = [
-  { id: "1", name: "RO Service", sku: "RO-501", price: 1500, category: "RO" },
-  { id: "2", name: "RO Filter 5-Stage", sku: "RO-502", price: 850, category: "RO" },
-  { id: "3", name: "Washing Machine Repair", sku: "WM-201", price: 2800, category: "Washing Machine" },
-  { id: "4", name: "WM Belt Replacement", sku: "WM-202", price: 650, category: "Washing Machine" },
-  { id: "5", name: "Geyser Installation", sku: "GY-101", price: 4500, category: "Geyser" },
-  { id: "6", name: "Geyser Heating Rod 2KW", sku: "GY-102", price: 1200, category: "Geyser" },
-  { id: "7", name: "AC Gas Refill R32", sku: "AC-301", price: 2500, category: "AC" },
-  { id: "8", name: "AC Full Service", sku: "AC-302", price: 1800, category: "AC" },
-  { id: "9", name: "Chimney Deep Clean", sku: "CH-401", price: 1500, category: "Chimney" },
-  { id: "10", name: "Chimney Filter Mesh", sku: "CH-402", price: 450, category: "Chimney" },
-];
+import { useProducts, useSales, useCustomers, type Product } from "@/hooks/use-local-store";
 
 const GST_RATE = 18;
 
@@ -29,6 +16,10 @@ interface QuickBillModalProps {
 }
 
 export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
+  const { items: catalog } = useProducts();
+  const { add: addSale } = useSales();
+  const { items: customers, add: addCustomer, update: updateCustomer } = useCustomers();
+
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState("");
@@ -39,28 +30,26 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
 
   const filteredProducts = useMemo(() => {
     const q = search.toLowerCase();
-    return CATALOG.filter(
+    return catalog.filter(
       (p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)
     );
-  }, [search]);
+  }, [search, catalog]);
 
   const subtotal = useMemo(() => cart.reduce((s, i) => s + i.price * i.qty, 0), [cart]);
   const gstAmount = gstEnabled ? Math.round(subtotal * GST_RATE / 100) : 0;
   const total = subtotal + gstAmount;
 
-  const addToCart = useCallback((product: typeof CATALOG[0]) => {
+  const addToCart = useCallback((product: Product) => {
     setCart((prev) => {
       const existing = prev.find((i) => i.id === product.id);
       if (existing) return prev.map((i) => (i.id === product.id ? { ...i, qty: i.qty + 1 } : i));
-      return [...prev, { ...product, qty: 1 }];
+      return [...prev, { id: product.id, name: product.name, sku: product.sku, price: product.price, qty: 1 }];
     });
   }, []);
 
   const updateQty = useCallback((id: string, delta: number) => {
     setCart((prev) =>
-      prev
-        .map((i) => (i.id === id ? { ...i, qty: i.qty + delta } : i))
-        .filter((i) => i.qty > 0)
+      prev.map((i) => (i.id === id ? { ...i, qty: i.qty + delta } : i)).filter((i) => i.qty > 0)
     );
   }, []);
 
@@ -85,6 +74,41 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
   };
 
   const handleDone = () => {
+    // Persist sale
+    const itemNames = cart.map((i) => i.name).join(", ");
+    addSale({
+      id: invoiceId,
+      customer: customerName || "Walk-in",
+      customerPhone: customerPhone,
+      items: itemNames,
+      amount: total,
+      status: "Paid",
+      date: "Just now",
+      timestamp: Date.now(),
+    });
+
+    // Update or create customer
+    if (customerName) {
+      const existing = customers.find(
+        (c) => c.phone === customerPhone || c.name.toLowerCase() === customerName.toLowerCase()
+      );
+      if (existing) {
+        updateCustomer(existing.id, {
+          purchases: existing.purchases + 1,
+          lastVisit: "Just now",
+        });
+      } else {
+        addCustomer({
+          id: `c${Date.now()}`,
+          name: customerName,
+          phone: customerPhone || "",
+          balance: 0,
+          purchases: 1,
+          lastVisit: "Just now",
+        });
+      }
+    }
+
     setBillDone(true);
     setTimeout(() => {
       setBillDone(false);
@@ -120,10 +144,8 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-end md:items-center justify-center"
     >
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={resetAndClose} />
 
-      {/* Modal */}
       <motion.div
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -143,7 +165,6 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* Step indicators */}
             <div className="flex gap-1">
               {[1, 2, 3].map((s) => (
                 <div
@@ -169,11 +190,7 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
               exit={{ opacity: 0, scale: 0.8 }}
               className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/95 backdrop-blur-xl"
             >
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", damping: 12, delay: 0.1 }}
-              >
+              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", damping: 12, delay: 0.1 }}>
                 <CheckCircle className="h-20 w-20 text-brand-success mb-4" />
               </motion.div>
               <p className="text-xl font-bold text-foreground">Bill Created! ✅</p>
@@ -185,7 +202,6 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-4">
           <AnimatePresence mode="wait">
-            {/* ═══ STEP 1: Product Selection ═══ */}
             {step === 1 && (
               <motion.div key="step1" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} className="space-y-3">
                 <div className="relative">
@@ -227,7 +243,6 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
                   })}
                 </div>
 
-                {/* Cart summary */}
                 {cart.length > 0 && (
                   <div className="glass-strong rounded-xl p-3 space-y-2">
                     <div className="flex items-center justify-between">
@@ -258,7 +273,6 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
               </motion.div>
             )}
 
-            {/* ═══ STEP 2: Customer & GST ═══ */}
             {step === 2 && (
               <motion.div key="step2" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} className="space-y-4">
                 <div className="space-y-3">
@@ -284,7 +298,6 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
                   </div>
                 </div>
 
-                {/* GST toggle */}
                 <div className="glass rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -303,7 +316,6 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
                     </button>
                   </div>
 
-                  {/* Breakdown */}
                   <div className="space-y-2 pt-2 border-t border-border/50">
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>Subtotal ({cart.length} items)</span>
@@ -324,10 +336,8 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
               </motion.div>
             )}
 
-            {/* ═══ STEP 3: Invoice Preview & Share ═══ */}
             {step === 3 && (
               <motion.div key="step3" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} className="space-y-4">
-                {/* Invoice card */}
                 <div className="glass-strong rounded-2xl p-5 space-y-4" id="invoice-preview">
                   <div className="text-center border-b border-border/50 pb-3">
                     <h3 className="text-lg font-bold text-foreground font-brand">Shree Umiya Electronics</h3>
@@ -369,7 +379,6 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
                   </div>
                 </div>
 
-                {/* Action buttons */}
                 <div className="grid grid-cols-2 gap-3">
                   <motion.button
                     whileTap={{ scale: 0.95 }}
