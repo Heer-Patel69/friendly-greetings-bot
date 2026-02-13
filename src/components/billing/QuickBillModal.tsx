@@ -92,7 +92,12 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
     setTimeout(() => setBarcodeFeedback("idle"), 1500);
   }, [catalog, addToCart]);
 
-  const invoiceId = useMemo(() => `INV-${Date.now().toString(36).toUpperCase().slice(-6)}`, [billDone]);
+  const invoiceId = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const seq = String(Math.floor(Math.random() * 9999) + 1).padStart(4, "0");
+    return `SUE-${year}-${seq}`;
+  }, [billDone]);
 
   const paymentLinkUrl = remaining > 0 ? `https://rzp.io/i/${invoiceId.slice(-8)}` : undefined;
 
