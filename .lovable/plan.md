@@ -1,91 +1,125 @@
 
 
-# Phase 6: Offline-First Sync & Conflict Resolution + Supplier Quick-Order & Procurement
+# Phase 7: Automation & Reminders + Authentication & Multi-Store
 
-Two upgrades that complete the operational backbone: a visible, robust sync engine with connectivity awareness, and a full supplier management + procurement workflow.
+Two foundational upgrades: an automation engine for AMC reminders and payment follow-ups (local-first with WhatsApp), and a full Supabase-powered auth system with store registration, onboarding wizard, and staff role management.
 
 ---
 
 ## What Changes
 
-### 1. Offline-First Sync & Conflict Resolution
+### 1. Automation & Reminders Engine
 
-The current system already has the right foundation: IndexedDB via Dexie, a `syncQueue` table, `queueSync()` helper, and a basic `startSyncService()` that runs every 30s. What's missing is **user visibility** and **conflict handling**.
+A new "Automations" page accessible from Settings/More that manages recurring service reminders and payment follow-ups.
 
-**New hook -- `useSyncStatus()`:**
-- Exposes: `isOnline`, `pendingCount`, `lastSyncAt`, `syncNow()`, `pendingItems[]`
-- Uses `navigator.onLine` + `online`/`offline` events for real-time connectivity
-- Queries `db.syncQueue.where("synced").equals(0).count()` reactively via `useLiveQuery`
-
-**Connectivity indicator in PageShell + Dashboard:**
-- Small colored dot in the PageShell header (green = online, amber = syncing, red = offline)
-- Badge with pending count when > 0 (e.g., "3 unsynced")
-- Tapping the dot opens a "Sync Status" bottom sheet
-
-**Sync Status Sheet (`SyncStatusSheet.tsx`):**
-- Shows: connectivity status, pending item count grouped by table, last sync timestamp
-- "Sync Now" button (triggers immediate sync attempt)
-- List of unsynced operations with table name, operation type, and timestamp
-- "Clear Synced" button to flush completed queue items from IndexedDB
-- Per-item "Retry" and "Discard" actions for failed items
-
-**Enhanced sync engine in `offline-db.ts`:**
-- Add `retryCount` and `lastError` fields to `SyncQueueItem`
-- Add `failedAt` timestamp for items that failed
-- `startSyncService()` returns cleanup function (already does) + emits sync events via a simple EventTarget
-- Add `getSyncStats()` function returning counts by table and status
-
-**Conflict resolution strategy (documented + stub):**
-- For now (no cloud backend), all items are queued optimistically
-- When cloud connects: server-assigned IDs will be mapped via a `localId -> serverId` mapping table
-- Timestamp-based last-writer-wins for field-level conflicts
-- Duplicate invoice IDs: client generates with local prefix, server reassigns canonical ID
-- Add a `conflictResolution` field to SyncQueueItem: "pending" | "resolved" | "conflict"
-
-### 2. Supplier Quick-Order & Procurement
-
-The current `Purchase.tsx` is hardcoded mock data. Suppliers exist in IndexedDB but aren't used in procurement. We build a real workflow.
-
-**Supplier Master (enhanced `Purchase.tsx`):**
-- Tab toggle: "Orders" | "Suppliers"
-- Suppliers tab: list of all suppliers with name, phone, product count, WhatsApp button
-- Tap supplier to expand: contact details, linked products, "Reorder Low Stock" button
-- Add/edit supplier inline
-
-**Product-Supplier mapping:**
-- Already exists via `product.supplierId` -- we surface it in the procurement view
-- "Low Stock by Supplier" view: group all low-stock products by their supplier
-- Each group shows supplier name, product list with current stock vs. reorder level
-
-**Reorder Suggestions:**
-- Auto-suggest reorder qty = max(10, reorderLevel * 3) or based on weekly sales average if data exists
-- Calculation: `weeklyAvg = (total sold in last 30 days / 4.3)`, suggested qty = `weeklyAvg * 2` (2-week buffer), minimum = reorderLevel
-
-**Quick-Order WhatsApp flow:**
-- "Reorder from Supplier" button on low-stock products
-- Select products + quantities in a checklist
-- Preview templated WhatsApp message with store name, SKU list, quantities
-- "Send via WhatsApp" opens wa.me link with the message
-- Log the order as a PurchaseOrder record in IndexedDB
-
-**New `PurchaseOrder` type + table:**
+**New data model -- `Reminder` type + IndexedDB table:**
 ```
-PurchaseOrder {
+Reminder {
   id: string
-  supplierId: string
-  items: { productId: string; name: string; sku: string; qty: number; cost: number }[]
-  total: number
-  status: "Draft" | "Sent" | "Received" | "Cancelled"
-  sentAt?: number
-  receivedAt?: number
+  type: "AMC" | "FilterChange" | "Service" | "PaymentFollowup" | "Custom"
+  customerId: string
+  customerName: string
+  customerPhone: string
+  title: string
+  message: string
+  frequency: "once" | "monthly" | "quarterly" | "biannual" | "annual"
+  nextDueAt: number             // timestamp of next reminder
+  lastTriggeredAt?: number
+  lastServiceDate?: number
+  jobCardId?: string            // linked job card if applicable
+  deviceInfo?: string           // e.g., "Samsung AC - Model X"
+  status: "Active" | "Paused" | "Completed" | "Cancelled"
   createdAt: number
   notes?: string
 }
 ```
 
-**Receive stock flow:**
-- When PO status changes to "Received", increment product stock for each item
-- Show confirmation with quantity received vs. ordered
+**Automation Centre page (`src/pages/Automations.tsx`):**
+- Tab toggle: "Upcoming" | "All Reminders" | "Templates"
+- Upcoming tab: chronological list of due/overdue reminders with "Send Now" (WhatsApp), "Snooze", "Mark Done"
+- All Reminders tab: full list grouped by customer with pause/cancel/edit
+- Templates tab: pre-built WhatsApp message templates for AMC renewal, filter change, payment nudge, seasonal service (AC pre-summer)
+- Overdue items highlighted with red badge and count
+- "Add Reminder" modal: select customer, type, frequency, message template, start date
+
+**Auto-reminder creation triggers:**
+- When a job card is completed (status = "Delivered"), prompt to create a follow-up reminder (e.g., 6-month service)
+- When a sale with balance > 0 is created, auto-create a payment follow-up reminder (7 days from now)
+- Manual creation from the Automations page or customer detail view
+
+**Reminder check engine:**
+- A hook `useReminders()` that checks for due reminders on app load and every 5 minutes
+- Shows a badge count on the Automations nav link for overdue items
+- Dashboard card showing "X reminders due today" with quick action
+
+**WhatsApp message templates:**
+- AMC Renewal: "Namaste {name} ji, your {device} AMC is due for renewal. Schedule service at your convenience. -- {storeName}"
+- Filter Change: "Hi {name}, it's time to change your {device} filter. Call us to book. -- {storeName}"
+- Payment Reminder: "Namaste {name} ji, a friendly reminder about your pending balance of Rs.{amount}. -- {storeName}"
+- Seasonal: "Summer is coming! Get your AC serviced before peak season. Book now. -- {storeName}"
+
+**Smart scheduling:**
+- Based on `lastServiceDate` + device type, suggest next service interval (AC = 6 months pre-summer, RO = 3 months filter, Geyser = annual)
+- Show "Suggested" badge on auto-generated reminders
+
+### 2. Authentication & Multi-Store (Supabase)
+
+Full authentication flow with store registration, onboarding, and role-based access. Requires connecting an external Supabase project.
+
+**Supabase schema (migrations):**
+
+Tables:
+- `profiles`: `id (uuid, FK auth.users), full_name, phone, avatar_url, created_at`
+- `stores`: `id (uuid), owner_id (FK auth.users), name, slug, logo_url, address, city, gstin, phone, whatsapp, categories, is_open, created_at`
+- `store_members`: `id (uuid), store_id (FK stores), user_id (FK auth.users), invited_by (FK auth.users), joined_at`
+- `user_roles`: `id (uuid), user_id (FK auth.users), role (app_role enum: owner, cashier, technician), unique(user_id, role)`
+- Security definer function `has_role(user_id, role)` for RLS policies
+
+RLS policies:
+- `profiles`: users can read/update their own profile
+- `stores`: owners can CRUD, members can read
+- `store_members`: owners can manage, members can read their own
+- `user_roles`: read own role via `has_role()` function, owners manage roles
+
+**Auth pages:**
+- `src/pages/Auth.tsx`: Login/Register with email + password, Google OAuth option
+- Clean split-screen on desktop, full mobile form
+- After registration, redirect to onboarding wizard
+
+**Onboarding wizard (`src/pages/Onboarding.tsx`):**
+- Step 1: Store basics (name, category, city)
+- Step 2: Business details (GSTIN, address, phone, logo upload)
+- Step 3: First product import (manual entry or CSV)
+- Step 4: POS setup (default payment methods, tax rate)
+- Progress bar at top, skip option for steps 3-4
+- On completion, create `store` record + `store_member` + `user_role(owner)`, redirect to dashboard
+
+**Auth context (`src/hooks/use-auth.tsx`):**
+- `AuthProvider` wrapping the app
+- Exposes: `user`, `session`, `store`, `role`, `signIn()`, `signUp()`, `signOut()`, `loading`
+- `onAuthStateChange` listener set up before `getSession()`
+- Protected route wrapper that redirects unauthenticated users to `/auth`
+
+**Store isolation:**
+- All data queries scoped by `store_id`
+- Current store ID stored in auth context
+- Multi-store admin: owners can switch between stores via a store selector dropdown
+
+**Staff management (in Settings):**
+- "Staff & Roles" section expands to show team members
+- Invite staff by phone/email
+- Assign role: Cashier (POS + sales only), Technician (job cards only), Owner (full access)
+- Role-based nav: cashiers don't see Reports/Settings, technicians only see Job Cards
+
+**Data migration strategy:**
+- Existing IndexedDB data can be "uploaded" to cloud on first login
+- One-time migration flow: after auth, check if local data exists, offer to push to cloud
+- After migration, local data becomes a cache layer synced via the existing sync queue
+
+### Integration between features:
+- Reminders table lives in IndexedDB initially (offline-first), syncs to Supabase `reminders` table when cloud is connected
+- Auth gates the business app routes; marketing/public store remains open
+- Store profile from Supabase replaces the IndexedDB `storeProfile` table after migration
 
 ---
 
@@ -93,110 +127,196 @@ PurchaseOrder {
 
 | File | Purpose |
 |------|---------|
-| `src/hooks/use-sync-status.ts` | Hook exposing online status, pending count, sync controls |
-| `src/components/layout/SyncStatusSheet.tsx` | Bottom sheet showing sync queue, connectivity, manual sync |
-| `src/components/layout/ConnectivityDot.tsx` | Small animated dot indicator for online/offline/syncing state |
+| `src/pages/Automations.tsx` | Automation centre with reminder management, templates, scheduling |
+| `src/pages/Auth.tsx` | Login/Register page with email and Google OAuth |
+| `src/pages/Onboarding.tsx` | Multi-step store setup wizard after registration |
+| `src/hooks/use-auth.tsx` | Auth context provider with user, store, role state |
+| `src/components/auth/ProtectedRoute.tsx` | Route wrapper that redirects to /auth if not logged in |
+| `src/components/auth/RoleGate.tsx` | Component that hides children based on user role |
+| `src/integrations/supabase/client.ts` | Supabase client initialization |
+| `src/integrations/supabase/types.ts` | Generated TypeScript types for Supabase tables |
+
+## Supabase Migrations to Create
+
+| Migration | Purpose |
+|-----------|---------|
+| `create_profiles_table` | User profiles with RLS |
+| `create_stores_table` | Store records with owner FK and RLS |
+| `create_store_members_table` | Store membership with RLS |
+| `create_user_roles` | Role enum + user_roles table + `has_role()` function + RLS |
+| `create_reminders_table` | Cloud-synced reminders table (optional, for when sync is active) |
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/lib/offline-db.ts` | Add `retryCount`, `lastError`, `failedAt` to SyncQueueItem; add PurchaseOrder type + table; bump schema to v5; add `getSyncStats()` |
-| `src/hooks/use-offline-store.ts` | Add `usePurchaseOrders()` hook |
-| `src/components/layout/PageShell.tsx` | Add ConnectivityDot to header |
-| `src/components/layout/AppLayout.tsx` | Add ConnectivityDot to sidebar header |
-| `src/pages/Purchase.tsx` | Full rewrite: supplier management, low-stock reorder, PO creation, WhatsApp quick-order, receive stock |
+| `src/lib/offline-db.ts` | Add `Reminder` type + `reminders` table, bump to schema v6 |
+| `src/hooks/use-offline-store.ts` | Add `useReminders()` hook |
+| `src/App.tsx` | Add Auth, Onboarding, Automations routes; wrap business routes in ProtectedRoute |
+| `src/main.tsx` | Wrap app in AuthProvider |
+| `src/components/layout/AppLayout.tsx` | Add Automations to sidebar, add store selector dropdown, show user avatar, add sign-out |
+| `src/components/layout/BottomNav.tsx` | Conditionally show nav items based on role |
+| `src/pages/More.tsx` | Add Automations link |
+| `src/pages/Settings.tsx` | Expand "Staff & Roles" into a functional staff management section |
+| `src/pages/Dashboard.tsx` | Add "Reminders due today" card |
+| `src/pages/JobCards.tsx` | On job completion, prompt to create follow-up reminder |
 
 ---
 
 ## Technical Details
 
-### useSyncStatus Hook
+### Reminder Check Engine
 
 ```typescript
-export function useSyncStatus() {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const pendingCount = useLiveQuery(() => 
-    db.syncQueue.where("synced").equals(0).count(), [], 0
-  );
-  const pendingItems = useLiveQuery(() => 
-    db.syncQueue.where("synced").equals(0).toArray(), [], []
-  );
+export function useReminderAlerts() {
+  const { items: reminders } = useReminders();
+  const overdueCount = useMemo(() => {
+    const now = Date.now();
+    return reminders.filter(r => 
+      r.status === "Active" && r.nextDueAt <= now
+    ).length;
+  }, [reminders]);
+  
+  const todayReminders = useMemo(() => {
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+    const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
+    return reminders.filter(r => 
+      r.status === "Active" && 
+      r.nextDueAt >= todayStart.getTime() && 
+      r.nextDueAt <= todayEnd.getTime()
+    );
+  }, [reminders]);
+  
+  return { overdueCount, todayReminders };
+}
+```
+
+### Smart Service Intervals
+
+```typescript
+const SERVICE_INTERVALS: Record<string, number> = {
+  "AC": 180 * 86400000,           // 6 months
+  "RO": 90 * 86400000,            // 3 months (filter)
+  "Geyser": 365 * 86400000,       // annual
+  "Washing Machine": 365 * 86400000,
+  "Chimney": 180 * 86400000,
+};
+
+function suggestNextServiceDate(deviceType: string, lastServiceDate: number): number {
+  const interval = SERVICE_INTERVALS[deviceType] ?? 180 * 86400000;
+  return lastServiceDate + interval;
+}
+```
+
+### Auth Context
+
+```typescript
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const onOnline = () => setIsOnline(true);
-    const onOffline = () => setIsOnline(false);
-    window.addEventListener("online", onOnline);
-    window.addEventListener("offline", onOffline);
-    return () => { window.removeEventListener("online", onOnline); window.removeEventListener("offline", onOffline); };
-  }, []);
-
-  const syncNow = useCallback(async () => {
-    // Trigger immediate sync cycle
-    const pending = await getPendingSyncItems();
-    if (pending.length === 0) return;
-    // Cloud push would go here
-    console.log(`[Sync] Manual sync: ${pending.length} items`);
-  }, []);
-
-  return { isOnline, pendingCount, pendingItems, syncNow };
-}
-```
-
-### ConnectivityDot Component
-
-A 6px animated circle: green pulse when online, red solid when offline, amber spinning when syncing. Shows pending count badge when > 0.
-
-### Reorder Suggestion Logic
-
-```typescript
-function suggestReorderQty(product: Product, sales: Sale[]): number {
-  const thirtyDaysAgo = Date.now() - 30 * 86400000;
-  const recentSales = sales.filter(s => s.timestamp >= thirtyDaysAgo);
-  let totalSold = 0;
-  recentSales.forEach(s => {
-    s.cartItems?.forEach(item => {
-      if (item.id === product.id || item.name === product.name) totalSold += item.qty;
+    // Set up listener BEFORE getSession
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
+    );
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
     });
-  });
-  const weeklyAvg = totalSold / 4.3;
-  const twoWeekBuffer = Math.ceil(weeklyAvg * 2);
-  return Math.max(product.reorderLevel ?? 5, twoWeekBuffer, 10);
+    return () => subscription.unsubscribe();
+  }, []);
+  // ...
 }
 ```
 
-### WhatsApp Quick-Order Template
+### Protected Route
 
 ```typescript
-function buildReorderMessage(supplier: Supplier, items: ReorderItem[], storeName: string): string {
-  const itemLines = items.map(i => `- ${i.name} (${i.sku}) x ${i.qty}`).join("\n");
-  return `Reorder Request from ${storeName}\n\n${itemLines}\n\nPlease confirm availability and delivery.\n\n— Sent from DukaanOS`;
+export function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return <LoadingSpinner />;
+  if (!user) return <Navigate to="/auth" replace />;
+  return <>{children}</>;
 }
 ```
 
-### Schema v5 Migration
+### Role-Based Navigation
 
-- Add `purchaseOrders` table: `"id, supplierId, status, createdAt"`
-- Extend `SyncQueueItem` with optional `retryCount`, `lastError`, `failedAt`
+```typescript
+function getNavForRole(role: string, t: Function) {
+  const all = [
+    { to: "/dashboard", icon: LayoutDashboard, label: t("nav.dashboard"), roles: ["owner", "cashier", "technician"] },
+    { to: "/sales", icon: ShoppingCart, label: t("nav.sales"), roles: ["owner", "cashier"] },
+    { to: "/inventory", icon: Package, label: t("nav.inventory"), roles: ["owner"] },
+    { to: "/job-cards", icon: Wrench, label: "Job Cards", roles: ["owner", "technician"] },
+    { to: "/reports", icon: BarChart3, label: t("nav.reports"), roles: ["owner"] },
+    { to: "/settings", icon: Settings, label: t("nav.settings"), roles: ["owner"] },
+  ];
+  return all.filter(link => link.roles.includes(role));
+}
+```
+
+### Supabase Profiles Trigger
+
+```sql
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name)
+  VALUES (new.id, new.raw_user_meta_data->>'full_name');
+  RETURN new;
+END;
+$$;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+```
+
+### Schema v6 Migration (IndexedDB)
+
+- Add `reminders` table: `"id, customerId, type, status, nextDueAt, createdAt"`
 - No breaking changes to existing tables
 
 ### Edge Cases
 
-- **Offline for days**: Queue grows but IndexedDB handles it fine; show count warning at 100+ items
-- **Receive partial PO**: Allow editing received qty per item, only increment what was received
-- **Supplier deleted with active POs**: Warn user, keep PO records intact with supplier name snapshot
-- **Duplicate PO sent via WhatsApp**: Idempotent -- PO status tracks sent state, user can re-send
-- **Stock increment on receive conflicts with simultaneous sale decrement**: Both operate independently on product.stock; final value is correct because both are additive operations
+- **No Supabase connected yet**: Auth pages show "Connect Supabase" prompt; automations work fully offline
+- **Reminder for deleted customer**: Keep reminder with snapshot of customer name/phone
+- **Multiple overdue reminders**: Group by customer in the notification view
+- **Staff invited but not registered**: Show "Pending" status, invite link re-sendable
+- **Role change while user is active**: Auth context re-fetches role on focus/visibility change
+- **Offline reminder trigger**: Reminders are checked locally; WhatsApp send works offline (opens wa.me)
+- **Store data migration collision**: If cloud already has data for the store, show merge confirmation
 
 ---
 
 ## Build Order
 
-1. Add `PurchaseOrder` type + table to `offline-db.ts` (schema v5), enhance SyncQueueItem
-2. Add `usePurchaseOrders()` hook to `use-offline-store.ts`
-3. Create `use-sync-status.ts` hook
-4. Create `ConnectivityDot.tsx` component
-5. Create `SyncStatusSheet.tsx` bottom sheet
-6. Update `PageShell.tsx` and `AppLayout.tsx` with connectivity indicator
-7. Full rewrite of `Purchase.tsx` with supplier management, PO flow, WhatsApp reorder
+1. Add `Reminder` type + table to `offline-db.ts` (schema v6)
+2. Add `useReminders()` hook to `use-offline-store.ts`
+3. Create `Automations.tsx` page with reminder management and templates
+4. Update `JobCards.tsx` to prompt follow-up reminder on completion
+5. Update `Dashboard.tsx` with reminders-due-today card
+6. Update `More.tsx` and `AppLayout.tsx` sidebar with Automations link
+7. Connect external Supabase project (user action required)
+8. Create Supabase migrations: profiles, stores, store_members, user_roles
+9. Create `supabase/client.ts` and `types.ts`
+10. Create `use-auth.tsx` context provider
+11. Create `Auth.tsx` login/register page
+12. Create `Onboarding.tsx` wizard
+13. Create `ProtectedRoute.tsx` and `RoleGate.tsx`
+14. Update `App.tsx` with auth routes and protected wrappers
+15. Update `main.tsx` with AuthProvider
+16. Update `Settings.tsx` with staff management
+17. Update `AppLayout.tsx` with user avatar, store selector, role-based nav
 
