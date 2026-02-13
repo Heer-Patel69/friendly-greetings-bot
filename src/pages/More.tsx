@@ -25,16 +25,16 @@ export default function More() {
           <NavLink
             key={link.to}
             to={link.to}
-            className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3 active:scale-[0.99] transition-transform shadow-brand hover:shadow-elevated block"
+            className="glass rounded-2xl p-4 flex items-center gap-3 active:scale-[0.99] transition-all hover:bg-card/70 block group"
           >
-            <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center">
+            <div className="h-11 w-11 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:scale-110 transition-transform">
               <link.icon className="h-5 w-5 text-primary" />
             </div>
             <div className="flex-1">
               <span className="text-sm font-semibold text-foreground block">{link.label}</span>
               <span className="text-xs text-muted-foreground">{link.desc}</span>
             </div>
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
           </NavLink>
         ))}
       </div>

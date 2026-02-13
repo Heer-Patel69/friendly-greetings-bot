@@ -60,6 +60,7 @@ export default {
         brand: {
           gold: "hsl(var(--brand-gold))",
           "blue-light": "hsl(var(--brand-blue-light))",
+          "blue-deep": "hsl(var(--brand-blue-deep))",
           surface: "hsl(var(--brand-surface))",
           success: "hsl(var(--brand-success))",
           warning: "hsl(var(--brand-warning))",
