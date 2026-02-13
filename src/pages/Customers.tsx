@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { PageShell } from "@/components/layout/PageShell";
 import { Search, Plus, Phone, MessageCircle, X, Check, Send, IndianRupee, AlertTriangle, CreditCard, Link2 } from "lucide-react";
-import { useCustomers, useSales } from "@/hooks/use-local-store";
+import { useCustomers, useSales } from "@/hooks/use-offline-store";
 import { useI18n } from "@/hooks/use-i18n";
 import { VoiceInputButton } from "@/components/ui/VoiceInputButton";
 import { motion, AnimatePresence } from "framer-motion";

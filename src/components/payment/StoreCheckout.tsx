@@ -5,7 +5,7 @@ import {
   ChevronRight, Package, CheckCircle, Loader2
 } from "lucide-react";
 import { processPayment, isRazorpayEnabled, type PaymentResult } from "@/lib/payment-service";
-import type { Product } from "@/hooks/use-local-store";
+import type { Product } from "@/hooks/use-offline-store";
 
 type CheckoutStep = "summary" | "details" | "payment" | "processing" | "success";
 

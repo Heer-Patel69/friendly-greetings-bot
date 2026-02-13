@@ -5,9 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import QuickBillModal from "@/components/billing/QuickBillModal";
 import PaymentModal from "@/components/payment/PaymentModal";
 import PaymentStatusBadge from "@/components/payment/PaymentStatusBadge";
-import { useSales } from "@/hooks/use-local-store";
+import { useSales } from "@/hooks/use-offline-store";
 import { useI18n } from "@/hooks/use-i18n";
-import type { Sale } from "@/hooks/use-local-store";
+import type { Sale } from "@/hooks/use-offline-store";
 
 export default function Sales() {
   const [billOpen, setBillOpen] = useState(false);

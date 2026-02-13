@@ -4,7 +4,7 @@ import {
   X, Search, Plus, Minus, Trash2, ArrowRight, ArrowLeft,
   FileText, Send, CheckCircle, Percent, ShoppingBag, Zap, ScanBarcode, Download, IndianRupee
 } from "lucide-react";
-import { useProducts, useSales, useCustomers, usePayments, type Product } from "@/hooks/use-local-store";
+import { useProducts, useSales, useCustomers, usePayments, type Product } from "@/hooks/use-offline-store";
 import { useI18n } from "@/hooks/use-i18n";
 import { VoiceInputButton } from "@/components/ui/VoiceInputButton";
 import { downloadInvoicePDF } from "@/lib/generate-invoice-pdf";
