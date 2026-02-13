@@ -155,6 +155,29 @@ export interface PurchaseOrder {
   notes?: string;
 }
 
+export type ReminderType = "AMC" | "FilterChange" | "Service" | "PaymentFollowup" | "Custom";
+export type ReminderFrequency = "once" | "monthly" | "quarterly" | "biannual" | "annual";
+export type ReminderStatus = "Active" | "Paused" | "Completed" | "Cancelled";
+
+export interface Reminder {
+  id: string;
+  type: ReminderType;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  title: string;
+  message: string;
+  frequency: ReminderFrequency;
+  nextDueAt: number;
+  lastTriggeredAt?: number;
+  lastServiceDate?: number;
+  jobCardId?: string;
+  deviceInfo?: string;
+  status: ReminderStatus;
+  createdAt: number;
+  notes?: string;
+}
+
 // ── Database ──
 
 class DukaanDB extends Dexie {
@@ -168,6 +191,7 @@ class DukaanDB extends Dexie {
   suppliers!: Table<Supplier, string>;
   storeProfile!: Table<StoreProfile, string>;
   purchaseOrders!: Table<PurchaseOrder, string>;
+  reminders!: Table<Reminder, string>;
 
   constructor() {
     super("dukaanos");
@@ -232,6 +256,21 @@ class DukaanDB extends Dexie {
       suppliers: "id, name, phone",
       storeProfile: "id",
       purchaseOrders: "id, supplierId, status, createdAt",
+    });
+
+    // v6: Add reminders table
+    this.version(6).stores({
+      products: "id, sku, category, name, barcode, supplierId",
+      customers: "id, phone, name",
+      sales: "id, customer, status, timestamp",
+      payments: "id, saleId, timestamp, customer",
+      jobCards: "id, status, createdAt, customerPhone",
+      syncQueue: "++id, table, synced, createdAt",
+      favorites: "id, productId, position",
+      suppliers: "id, name, phone",
+      storeProfile: "id",
+      purchaseOrders: "id, supplierId, status, createdAt",
+      reminders: "id, customerId, type, status, nextDueAt, createdAt",
     });
   }
 }

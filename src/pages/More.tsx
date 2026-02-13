@@ -1,6 +1,6 @@
 import { PageShell } from "@/components/layout/PageShell";
 import { NavLink } from "react-router-dom";
-import { Store, Wallet, Truck, Users, Settings as SettingsIcon, ChevronRight, Wrench } from "lucide-react";
+import { Store, Wallet, Truck, Users, Settings as SettingsIcon, ChevronRight, Wrench, Bell } from "lucide-react";
 import { useI18n } from "@/hooks/use-i18n";
 
 export default function More() {
@@ -12,6 +12,7 @@ export default function More() {
     { to: "/customers", icon: Users, label: t("nav.customers"), desc: t("more.crmContacts") },
     { to: "/online-store", icon: Store, label: t("nav.onlineStore"), desc: t("more.miniStore") },
     { to: "/job-cards", icon: Wrench, label: "Job Cards", desc: "Repair & service tracking" },
+    { to: "/automations", icon: Bell, label: "Automations", desc: "Reminders & follow-ups" },
     { to: "/settings", icon: SettingsIcon, label: t("nav.settings"), desc: t("more.configuration") },
   ];
 

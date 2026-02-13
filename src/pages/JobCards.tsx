@@ -6,8 +6,8 @@ import {
   Phone, MessageCircle, ChevronRight, X, Car, Cpu,
   FileText, IndianRupee, LayoutGrid, List, Send,
 } from "lucide-react";
-import { useJobCards, useProducts, usePayments } from "@/hooks/use-offline-store";
-import type { JobCard, JobStatus } from "@/lib/offline-db";
+import { useJobCards, useProducts, usePayments, useReminders } from "@/hooks/use-offline-store";
+import type { JobCard, JobStatus, Reminder } from "@/lib/offline-db";
 import { JobPhotos } from "@/components/job-cards/JobPhotos";
 import { PartsSelector } from "@/components/job-cards/PartsSelector";
 import { WorkLog } from "@/components/job-cards/WorkLog";
@@ -36,6 +36,7 @@ const DEVICE_TYPES = ["Mobile Phone", "Laptop", "Washing Machine", "AC", "Fridge
 export default function JobCards() {
   const { items: jobs, add: addJob, update: updateJob } = useJobCards();
   const { add: addPayment } = usePayments();
+  const { add: addReminder } = useReminders();
   const [search, setSearch] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -62,9 +63,36 @@ export default function JobCards() {
       status,
       workLog: [...(job.workLog ?? []), logEntry],
     };
-    if (status === "Delivered") updates.completedAt = Date.now();
+    if (status === "Delivered") {
+      updates.completedAt = Date.now();
+      // Auto-prompt follow-up reminder
+      const SERVICE_INTERVALS: Record<string, number> = {
+        "AC": 180, "RO": 90, "Geyser": 365, "Washing Machine": 365, "Chimney": 180,
+      };
+      const days = SERVICE_INTERVALS[job.deviceType] ?? 180;
+      const shouldCreate = confirm(`Job delivered! Create a follow-up reminder for ${job.customerName} in ${days} days?`);
+      if (shouldCreate) {
+        addReminder({
+          id: `REM-${Date.now()}`,
+          type: "Service",
+          customerId: "",
+          customerName: job.customerName,
+          customerPhone: job.customerPhone,
+          title: `${job.deviceType} Service Follow-up`,
+          message: `Hi ${job.customerName}, your ${job.deviceBrand} ${job.deviceModel} is due for service. — DukaanOS`,
+          frequency: "biannual",
+          nextDueAt: Date.now() + days * 86400000,
+          lastServiceDate: Date.now(),
+          jobCardId: job.id,
+          deviceInfo: `${job.deviceBrand} ${job.deviceModel}`,
+          status: "Active",
+          createdAt: Date.now(),
+        });
+        toast.success("Follow-up reminder created");
+      }
+    }
     updateJob(job.id, updates);
-  }, [updateJob]);
+  }, [updateJob, addReminder]);
 
   const handleTakeAdvance = useCallback(async (job: JobCard) => {
     const amountStr = prompt(`Take advance for ${job.customerName}\nEstimate: ₹${job.totalEstimate}\nAlready paid: ₹${job.advancePaid ?? 0}\n\nEnter advance amount:`);

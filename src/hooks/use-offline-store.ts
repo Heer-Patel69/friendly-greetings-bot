@@ -1,11 +1,11 @@
 import { useCallback } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, queueSync } from "@/lib/offline-db";
-import type { Product, Customer, Sale, Payment, JobCard, Favorite, Supplier, StoreProfile, PurchaseOrder } from "@/lib/offline-db";
+import type { Product, Customer, Sale, Payment, JobCard, Favorite, Supplier, StoreProfile, PurchaseOrder, Reminder } from "@/lib/offline-db";
 import type { Table } from "dexie";
 
 // Re-export types for backward compatibility
-export type { Product, Customer, Sale, Payment, JobCard, JobStatus, CartItem, Favorite, Supplier, StoreProfile, PurchaseOrder } from "@/lib/offline-db";
+export type { Product, Customer, Sale, Payment, JobCard, JobStatus, CartItem, Favorite, Supplier, StoreProfile, PurchaseOrder, Reminder, ReminderType, ReminderFrequency, ReminderStatus } from "@/lib/offline-db";
 
 // ── Specialized hooks (drop-in replacements for use-local-store) ──
 
@@ -144,6 +144,23 @@ export function usePurchaseOrders() {
   const remove = useCallback(async (id: string) => {
     await db.purchaseOrders.delete(id);
     await queueSync("purchaseOrders", "delete", id, { id });
+  }, []);
+  return { items, add, update, remove };
+}
+
+export function useReminders() {
+  const items = useLiveQuery(() => db.reminders.toArray(), [], []) as Reminder[];
+  const add = useCallback(async (item: Reminder) => {
+    await db.reminders.put(item);
+    await queueSync("reminders", "add", item.id, item);
+  }, []);
+  const update = useCallback(async (id: string, patch: Partial<Reminder>) => {
+    await db.reminders.update(id, patch);
+    await queueSync("reminders", "update", id, patch);
+  }, []);
+  const remove = useCallback(async (id: string) => {
+    await db.reminders.delete(id);
+    await queueSync("reminders", "delete", id, { id });
   }, []);
   return { items, add, update, remove };
 }
