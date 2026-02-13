@@ -1,10 +1,12 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { PageShell } from "@/components/layout/PageShell";
-import { Search, Plus, Phone, MessageCircle, X, Check, Send, IndianRupee, AlertTriangle } from "lucide-react";
+import { Search, Plus, Phone, MessageCircle, X, Check, Send, IndianRupee, AlertTriangle, CreditCard, Link2 } from "lucide-react";
 import { useCustomers, useSales } from "@/hooks/use-local-store";
 import { useI18n } from "@/hooks/use-i18n";
 import { VoiceInputButton } from "@/components/ui/VoiceInputButton";
 import { motion, AnimatePresence } from "framer-motion";
+import PaymentModal from "@/components/payment/PaymentModal";
+import PaymentStatusBadge from "@/components/payment/PaymentStatusBadge";
 
 export default function Customers() {
   const { items: customers, add, update } = useCustomers();
@@ -17,6 +19,10 @@ export default function Customers() {
   const [balance, setBalance] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
+
+  // Payment modal state
+  const [paymentModalCustomer, setPaymentModalCustomer] = useState<{ id: string; name: string; phone: string; balance: number } | null>(null);
+  const [paymentModalMode, setPaymentModalMode] = useState<"checkout" | "link">("checkout");
 
   const filtered = customers.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search)
@@ -43,18 +49,20 @@ export default function Customers() {
     setSelectedCustomer(null);
   };
 
+  const handleOnlinePaymentSuccess = () => {
+    if (!paymentModalCustomer) return;
+    update(paymentModalCustomer.id, { balance: 0 });
+    setPaymentModalCustomer(null);
+  };
+
   const sendReminder = (customer: { name: string; phone: string; balance: number }) => {
-    const phone = customer.phone.replace(/\D/g, "");
+    const ph = customer.phone.replace(/\D/g, "");
     const msg = encodeURIComponent(
       `🙏 नमस्ते ${customer.name} जी,\n\nShree Umiya Electronics से आपका बकाया:\n\n💰 *Pending: ₹${customer.balance.toLocaleString("en-IN")}*\n\nKripya jaldi se payment kar dein. Dhanyavaad! 🙏\n\n— Shree Umiya Electronics\nSargasan, Gandhinagar`
     );
-    const url = phone
-      ? `https://wa.me/91${phone}?text=${msg}`
-      : `https://wa.me/?text=${msg}`;
-    window.open(url, "_blank");
+    window.open(ph ? `https://wa.me/91${ph}?text=${msg}` : `https://wa.me/?text=${msg}`, "_blank");
   };
 
-  // Get customer's invoice history
   const getCustomerInvoices = (customerName: string) => {
     return sales.filter((s) => s.customer.toLowerCase() === customerName.toLowerCase()).slice(0, 5);
   };
@@ -133,6 +141,12 @@ export default function Customers() {
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-brand-warning">₹{c.balance.toLocaleString("en-IN")}</span>
                     <button
+                      onClick={() => { setPaymentModalCustomer(c); setPaymentModalMode("link"); }}
+                      className="h-7 px-2 rounded-lg bg-primary/10 text-primary text-[10px] font-bold flex items-center gap-1 hover:bg-primary/20 transition-colors"
+                    >
+                      <Link2 className="h-3 w-3" /> Link
+                    </button>
+                    <button
                       onClick={() => sendReminder(c)}
                       className="h-7 px-2 rounded-lg bg-brand-success/10 text-brand-success text-[10px] font-bold flex items-center gap-1 hover:bg-brand-success/20 transition-colors"
                     >
@@ -163,9 +177,15 @@ export default function Customers() {
                       </div>
                     </div>
                     {c.balance > 0 && (
-                      <span className="text-[10px] font-bold text-brand-warning bg-brand-warning/10 px-2.5 py-1 rounded-lg border border-brand-warning/20">₹{c.balance.toLocaleString("en-IN")} {t("cust.due")}</span>
+                      <PaymentStatusBadge status="Pending" size="md" pulse />
                     )}
                   </div>
+                  {c.balance > 0 && (
+                    <div className="flex items-center justify-between glass rounded-xl px-3 py-2">
+                      <span className="text-[10px] text-muted-foreground">Outstanding</span>
+                      <span className="text-sm font-bold text-brand-warning">₹{c.balance.toLocaleString("en-IN")}</span>
+                    </div>
+                  )}
                 </button>
 
                 <div className="px-4 pb-3 flex gap-2">
@@ -176,9 +196,14 @@ export default function Customers() {
                     <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
                   </a>
                   {c.balance > 0 && (
-                    <button onClick={(e) => { e.stopPropagation(); sendReminder(c); }} className="flex-1 h-9 bg-brand-warning/10 border border-brand-warning/20 text-brand-warning rounded-xl text-xs font-medium flex items-center justify-center gap-1 hover:bg-brand-warning/15 transition-colors">
-                      <Send className="h-3.5 w-3.5" /> Remind
-                    </button>
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setPaymentModalCustomer(c); setPaymentModalMode("checkout"); }}
+                        className="flex-1 h-9 gradient-accent text-accent-foreground rounded-xl text-xs font-bold flex items-center justify-center gap-1 hover:brightness-110 transition-all"
+                      >
+                        <CreditCard className="h-3.5 w-3.5" /> Pay
+                      </button>
+                    </>
                   )}
                 </div>
 
@@ -187,11 +212,11 @@ export default function Customers() {
                   {isExpanded && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                       <div className="px-4 pb-4 space-y-3 border-t border-border/30 pt-3">
-                        {/* Collect Payment */}
+                        {/* Manual Collect Payment */}
                         {c.balance > 0 && (
                           <div className="glass rounded-xl p-3 space-y-2">
                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                              <IndianRupee className="h-3 w-3" /> Collect Payment
+                              <IndianRupee className="h-3 w-3" /> Collect Cash Payment
                             </label>
                             <div className="flex gap-2">
                               <input
@@ -210,6 +235,14 @@ export default function Customers() {
                                 <Check className="h-3.5 w-3.5" /> Collect
                               </button>
                             </div>
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setPaymentModalCustomer(c); setPaymentModalMode("link"); }}
+                                className="flex-1 h-9 rounded-lg glass text-primary text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-primary/10 transition-colors border border-primary/20"
+                              >
+                                <Link2 className="h-3 w-3" /> Send Payment Link
+                              </button>
+                            </div>
                           </div>
                         )}
 
@@ -224,13 +257,9 @@ export default function Customers() {
                                     <p className="text-xs text-foreground">{inv.items}</p>
                                     <p className="text-[10px] text-muted-foreground">{inv.id}</p>
                                   </div>
-                                  <div className="text-right">
+                                  <div className="text-right flex items-center gap-2">
                                     <p className="text-xs font-bold text-foreground">₹{inv.amount.toLocaleString("en-IN")}</p>
-                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                                      inv.status === "Paid" ? "bg-brand-success/10 text-brand-success" :
-                                      inv.status === "Partial" ? "bg-brand-warning/10 text-brand-warning" :
-                                      "bg-destructive/10 text-destructive"
-                                    }`}>{inv.status}</span>
+                                    <PaymentStatusBadge status={inv.status} pulse={inv.status !== "Paid"} />
                                   </div>
                                 </div>
                               ))}
@@ -246,6 +275,23 @@ export default function Customers() {
           })}
         </div>
       </div>
+
+      {/* Payment Modal */}
+      <AnimatePresence>
+        {paymentModalCustomer && (
+          <PaymentModal
+            open={!!paymentModalCustomer}
+            onClose={() => setPaymentModalCustomer(null)}
+            amount={paymentModalCustomer.balance}
+            invoiceId={`UDHAAR-${paymentModalCustomer.id}`}
+            customerName={paymentModalCustomer.name}
+            customerPhone={paymentModalCustomer.phone}
+            description={`Udhaar payment from ${paymentModalCustomer.name}`}
+            mode={paymentModalMode}
+            onPaymentSuccess={handleOnlinePaymentSuccess}
+          />
+        )}
+      </AnimatePresence>
     </PageShell>
   );
 }
