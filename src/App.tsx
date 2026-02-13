@@ -16,6 +16,8 @@ import OnlineStore from "./pages/OnlineStore";
 import SettingsPage from "./pages/Settings";
 import More from "./pages/More";
 import NotFound from "./pages/NotFound";
+import Stores from "./pages/Stores";
+import JobCards from "./pages/JobCards";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +30,7 @@ const App = () => (
         <Routes>
           {/* Marketing website — standalone */}
           <Route path="/" element={<Index />} />
+          <Route path="/stores" element={<Stores />} />
 
           {/* Business app — with sidebar/bottom nav */}
           <Route element={<AppLayout />}>
@@ -39,6 +42,7 @@ const App = () => (
             <Route path="/purchase" element={<Purchase />} />
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/online-store" element={<OnlineStore />} />
+            <Route path="/job-cards" element={<JobCards />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/more" element={<More />} />
           </Route>
