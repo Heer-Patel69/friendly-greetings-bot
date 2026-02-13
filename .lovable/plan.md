@@ -1,104 +1,97 @@
 
 
-# Phase 4: PDF Invoice Storage & Razorpay Integration Engine
+# Phase 5: Job Cards & Garage Module + Reports & Analytics Enhancement
 
-Upgrades the existing invoice PDF generator and payment service from simulation mode into a production-grade system with persistent PDF storage, invoice download/resend capabilities, and Razorpay-ready payment link auto-creation with webhook handling.
+Upgrades the existing Job Cards page from a basic status tracker into a full repair lifecycle manager with photos, inventory-linked parts, advance payments, and invoice generation. Enhances the Reports page with actionable metric cards, drill-down charts, CSV export, and "action suggestion" buttons.
 
 ---
 
 ## What Changes
 
-### 1. Enhanced PDF Generator (generate-invoice-pdf.ts)
+### 1. Job Cards — Full Repair Lifecycle
 
-The current generator is already accounting-grade with logo, GST breakdown, QR code, and payment link embedding. Enhancements:
+The current `JobCards.tsx` (440 lines) has a solid foundation: 3-step creation modal, status pills, complaints, estimates, and WhatsApp updates. We enhance it with:
 
-- **Per-item GST support**: Use each product's individual `gst` field instead of a flat 18% rate across all items. The summary section will show grouped GST breakdowns (e.g., "CGST 9% + SGST 9%").
-- **HSN column**: Add HSN/SAC code column to the items table (pulled from product SKU or a new optional field).
-- **Store profile integration**: Pull logo image, store name, address, GSTIN, and phone from `StoreProfile` in IndexedDB instead of hardcoded values.
-- **PDF metadata**: Embed `pdf_generated_at` timestamp in the document properties.
-
-### 2. Invoice PDF Storage & Resend (New System)
-
-Currently, `downloadInvoicePDF()` generates and immediately triggers a browser download. There is no persistence -- the PDF is lost after download. New flow:
-
-**Schema additions to `Sale` type:**
+**Data model upgrade — extend `JobCard` type:**
 ```
-pdfDataUrl?: string          // base64 PDF stored in IndexedDB
-pdfGeneratedAt?: number      // timestamp
-razorpayPaymentId?: string   // (already exists)
+advancePaid: number               (advance payment collected)
+partsUsed: { productId: string; qty: number; name: string; cost: number }[]
+workLog: { timestamp: number; entry: string; tech?: string }[]
+invoiceId?: string                (linked invoice after completion)
+approvalSentAt?: number           (when estimate was sent for approval)
+completedAt?: number
 ```
 
-**New flow after sale creation:**
-1. Generate PDF blob via `getInvoicePDFBlob()`
-2. Convert blob to base64 data URL
-3. Store data URL in the sale record's `pdfDataUrl` field
-4. Show toast with "Download" and "Send WhatsApp" actions
-5. For resend: retrieve `pdfDataUrl` from sale record, convert back to blob, trigger download or share
+**Photo capture (before/after):**
+- Camera button in the expanded job card view using `<input type="file" accept="image/*" capture="environment">`
+- Images compressed via existing `compressImage()` utility from `image-utils.ts` (max 800px, JPEG 0.7)
+- Photos stored as base64 in the `photos` array (already exists in schema)
+- Display as a mini gallery with timestamp overlay
+- "Before" and "After" labels based on job status at time of photo capture
 
-**New utility functions in `generate-invoice-pdf.ts`:**
-- `generateAndStorePDF(data, saleId)` -- generates PDF, stores base64 in IndexedDB sale record, returns blob
-- `getStoredPDF(saleId)` -- retrieves stored PDF blob from sale record
-- `regeneratePDF(saleId)` -- regenerates PDF with updated data (e.g., after payment status change)
+**Parts from inventory (stock decrement):**
+- Replace the current free-text parts estimate with an inventory-aware selector
+- Dropdown searches products by name/SKU from the products table
+- When job status moves to "In Progress" or "Ready" and parts are confirmed, decrement product stock
+- Show stock availability inline ("12 in stock" / "Out of stock" warning)
+- Part returns: button to reverse stock decrement if a part is removed from the job
 
-**Sales page enhancements:**
-- Each invoice row gets "Download PDF" and "Resend WhatsApp" action buttons
-- Download pulls from stored `pdfDataUrl` (instant, no regeneration needed)
-- WhatsApp resend opens wa.me with templated message + prompts user to attach downloaded PDF
+**Advance payment:**
+- "Take Advance" button in the estimate section opens a mini payment flow
+- Records a Payment entry linked to the job card
+- Shows advance paid vs. estimate total in the job card view
 
-### 3. Payment Link Auto-Creation on Invoice Save
+**Work log timeline:**
+- Automatic entries when status changes ("Status changed to In Progress")
+- Manual "Add Note" button for technician entries
+- Each entry shows timestamp and optional tech name
 
-When an invoice with balance > 0 is saved (from POS or QuickBillModal), automatically create a payment link:
+**Generate Invoice from job card:**
+- "Generate Invoice" button appears when status is "Ready" or "Delivered"
+- Creates a Sale record from job card data (parts + labor as line items)
+- Deducts advance from total, sets appropriate payment status
+- Links invoice ID back to the job card
+- Generates and stores PDF automatically
 
-**In POS.tsx `handlePaymentConfirm`:**
-1. After saving the sale, check if `balance > 0`
-2. Call `createPaymentLink()` from payment-service
-3. Store `paymentLink` (short URL) and `paymentLinkId` in the sale record
-4. Pass the payment link URL to the PDF generator for QR embedding
-5. Generate and store PDF with the real payment link
+**Send Estimate for approval:**
+- "Send Approval" button generates a WhatsApp message with formatted estimate breakdown
+- Includes a wa.me link with parts list, labor, total, and store contact
 
-**In QuickBillModal (already partially implemented):**
-- The modal already generates a simulated payment link URL -- wire it to actually call `createPaymentLink()` and update the sale record
+**Status board view (new toggle):**
+- Kanban-style columns: Received | Diagnosed | Approved | In Progress | Ready | Delivered
+- Each column shows count badge and job cards as compact tiles
+- Drag not needed (mobile-first) — tap to change status via pill selector (existing)
 
-### 4. Razorpay Integration Architecture (Backend-Ready)
+### 2. Reports & Analytics Enhancement
 
-The current `payment-service.ts` simulates all operations. We enhance it to be truly ready for Razorpay activation:
+The current `Reports.tsx` (307 lines) has revenue trend, top products, category pie, and customer analytics. We enhance with:
 
-**Updated payment-service.ts:**
-- Add `initializeRazorpay()` function that checks for Razorpay Checkout SDK script
-- Add `loadRazorpayCheckout()` that dynamically loads the Razorpay script tag
-- When `RAZORPAY_READY = true`:
-  - `processPayment()` opens real Razorpay Checkout modal
-  - `createPaymentLink()` calls edge function that proxies to Razorpay API
-  - `checkPaymentStatus()` calls edge function that queries Razorpay
+**New metric cards row (actionable):**
+- Today's Profit: revenue minus cost (uses product `cost` field)
+- Outstanding Dues: total unpaid across all customers with "Collect" action button
+- Low Stock Count: number of products below `reorderLevel` with "Reorder" action button
+- Job Cards Active: count of non-delivered jobs with "View" action button
 
-**Edge function stubs (for future Lovable Cloud activation):**
-- `create-payment-link`: POST to Razorpay Payment Links API
-- `razorpay-webhook`: Receives Razorpay webhook POSTs, verifies HMAC signature, updates sale status
-- `check-payment`: GET payment status from Razorpay
+**Profit calculation:**
+- For each sale, compute profit = sum of (item price - item cost) * qty
+- Display profit margin percentage alongside revenue
 
-**Webhook flow (documented, not yet active):**
-```
-Razorpay webhook POST -> Edge function -> Verify signature ->
-  If payment.captured: Update sale.paidAmount, sale.status = "Paid" ->
-    Regenerate PDF (remove QR section) -> Notify store owner
-  If payment_link.paid: Same flow
-  If payment.failed: Update sale with failure note
-```
+**Period selector enhancement:**
+- Add "90 Days" option alongside existing "7 Days" and "30 Days"
 
-### 5. Invoice Actions in Sales & Customers Pages
+**CSV Export:**
+- "Export CSV" button on each chart section
+- Sales CSV: Invoice ID, Date, Customer, Items, Amount, Paid, Status, GST
+- Products CSV: Name, SKU, Category, Price, Cost, Stock, Reorder Level
+- Customers CSV: Name, Phone, Purchases, Balance, Last Visit
 
-**Sales page (`Sales.tsx`) enhancements:**
-- Add "Download" button (PDF icon) to each invoice row
-- Add "Resend" button (WhatsApp icon) to each invoice row
-- Both work instantly from stored PDF data -- no regeneration delay
+**Action suggestions next to metrics:**
+- Low stock metric card shows "Create PO" button that navigates to `/purchase`
+- Outstanding dues card shows "Send Reminders" button that navigates to `/customers`
+- These are contextual CTAs based on the current state of data
 
-**Customers page invoice tab:**
-- When viewing a customer's invoices, each invoice shows Download/Resend actions
-- "Send Reminder" button on unpaid invoices generates WhatsApp message with payment link
-
-**POS post-checkout flow:**
-- After payment confirm, show a success screen with 3 buttons: "Download PDF", "Send WhatsApp", "New Bill"
-- PDF is generated in background and stored before buttons become active
+**Sales by payment method chart (new):**
+- Pie chart showing distribution: Cash vs UPI vs Udhaar
 
 ---
 
@@ -106,127 +99,139 @@ Razorpay webhook POST -> Edge function -> Verify signature ->
 
 | File | Purpose |
 |------|---------|
-| `src/lib/pdf-storage.ts` | Utility functions for storing/retrieving PDFs from IndexedDB sale records |
+| `src/components/job-cards/JobPhotos.tsx` | Camera capture + photo gallery with before/after labels |
+| `src/components/job-cards/PartsSelector.tsx` | Inventory-linked parts picker with stock display |
+| `src/components/job-cards/WorkLog.tsx` | Timeline display + add note form |
+| `src/components/job-cards/JobInvoiceGenerator.tsx` | Generate Sale + PDF from completed job card |
+| `src/components/reports/MetricCard.tsx` | Actionable metric card with drill-down navigation |
+| `src/components/reports/CSVExport.tsx` | Export button + CSV generation utility |
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/lib/offline-db.ts` | Add `pdfDataUrl` and `pdfGeneratedAt` to Sale type |
-| `src/lib/generate-invoice-pdf.ts` | Add per-item GST, store profile integration, generateAndStorePDF function |
-| `src/lib/payment-service.ts` | Add Razorpay Checkout SDK loader, enhance with edge function call stubs |
-| `src/pages/POS.tsx` | Auto-create payment link on balance > 0, store PDF after checkout, enhanced post-checkout actions |
-| `src/pages/Sales.tsx` | Add Download PDF and Resend WhatsApp buttons per invoice row |
-| `src/pages/Customers.tsx` | Add Download/Resend on invoice tab entries |
-| `src/components/billing/QuickBillModal.tsx` | Wire payment link creation and PDF storage |
+| `src/lib/offline-db.ts` | Extend `JobCard` type with `advancePaid`, `partsUsed`, `workLog`, `invoiceId`, `approvalSentAt`, `completedAt` |
+| `src/pages/JobCards.tsx` | Major rewrite: photo capture, inventory parts selector, advance payment, work log, invoice generation, status board view toggle |
+| `src/pages/Reports.tsx` | Add actionable metric cards, profit calculation, 90-day period, CSV export, payment method pie chart |
+| `src/hooks/use-offline-store.ts` | No changes needed (existing hooks cover all tables) |
 
 ---
 
 ## Technical Details
 
-### PDF Storage Strategy
+### JobCard Type Extension
 
-PDFs are stored as base64 data URLs in IndexedDB within the sale record. A typical invoice PDF is 30-80KB, which is safe for IndexedDB storage. For reference, IndexedDB can handle hundreds of MB.
+The IndexedDB schema indexes don't change (no version bump needed) — we're only adding optional fields to the `JobCard` interface:
 
 ```typescript
-// pdf-storage.ts
-export async function storePDF(saleId: string, blob: Blob): Promise<string> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const dataUrl = reader.result as string;
-      await db.sales.update(saleId, { 
-        pdfDataUrl: dataUrl, 
-        pdfGeneratedAt: Date.now() 
-      });
-      resolve(dataUrl);
-    };
-    reader.readAsDataURL(blob);
-  });
+export interface JobCard {
+  // ...existing fields...
+  advancePaid: number;
+  partsUsed: { productId: string; qty: number; name: string; cost: number }[];
+  workLog: { timestamp: number; entry: string; tech?: string }[];
+  invoiceId?: string;
+  approvalSentAt?: number;
+  completedAt?: number;
 }
+```
 
-export async function downloadStoredPDF(saleId: string): Promise<boolean> {
-  const sale = await db.sales.get(saleId);
-  if (!sale?.pdfDataUrl) return false;
+### Photo Capture Flow
+
+```typescript
+// Uses existing compressImage from image-utils.ts
+const handleCapture = async (e: ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const compressed = await compressImage(file, 800);
+  const photoEntry = compressed; // base64 data URL
+  updateJob(jobId, { 
+    photos: [...job.photos, photoEntry] 
+  });
+};
+```
+
+### Parts Stock Decrement
+
+```typescript
+const confirmParts = async (job: JobCard) => {
+  for (const part of job.partsUsed) {
+    const product = products.find(p => p.id === part.productId);
+    if (product) {
+      const newStock = Math.max(0, product.stock - part.qty);
+      await updateProduct(product.id, { stock: newStock });
+      if (newStock <= (product.reorderLevel ?? 5)) {
+        toast.warning(`Low stock: ${product.name} (${newStock} left)`);
+      }
+    }
+  }
+};
+```
+
+### Invoice Generation from Job Card
+
+```typescript
+const generateJobInvoice = async (job: JobCard) => {
+  const invoiceId = generateInvoiceId();
+  const items = [
+    ...job.partsUsed.map(p => ({ name: p.name, qty: p.qty, price: p.cost })),
+    { name: "Labor Charge", qty: 1, price: job.laborCharge },
+  ];
+  const total = job.totalEstimate;
+  const paidAmount = job.advancePaid;
+  const status = paidAmount >= total ? "Paid" : paidAmount > 0 ? "Partial" : "Pending";
+  
+  await addSale({ id: invoiceId, customer: job.customerName, ... });
+  await updateJob(job.id, { invoiceId, status: "Delivered", completedAt: Date.now() });
+  await generateAndStorePDF(invoiceData, invoiceId);
+};
+```
+
+### CSV Export Utility
+
+```typescript
+function exportToCSV(headers: string[], rows: string[][], filename: string) {
+  const csv = [headers.join(","), ...rows.map(r => r.map(c => `"${c}"`).join(","))].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
   const link = document.createElement("a");
-  link.href = sale.pdfDataUrl;
-  link.download = `${saleId}.pdf`;
+  link.href = URL.createObjectURL(blob);
+  link.download = `${filename}-${new Date().toISOString().slice(0,10)}.csv`;
   link.click();
-  return true;
 }
 ```
 
-### Payment Link Auto-Creation Flow
+### Profit Calculation
 
 ```typescript
-// In POS.tsx handlePaymentConfirm, after saving sale:
-if (balance > 0 && data.customerPhone) {
-  const link = await createPaymentLink({
-    amount: balance,
-    description: `Balance for ${invoiceId}`,
-    customerName: data.customerName,
-    customerPhone: data.customerPhone,
-    invoiceId,
-  });
-  await updateSale(invoiceId, { 
-    paymentLink: link.shortUrl, 
-    paymentLinkId: link.id 
-  });
-  // Generate PDF with real payment link
-  const pdfBlob = await getInvoicePDFBlob({ ...invoiceData, paymentLink: link.shortUrl });
-  await storePDF(invoiceId, pdfBlob);
-}
+const todayProfit = useMemo(() => {
+  return todaySales.reduce((sum, sale) => {
+    if (!sale.cartItems) return sum;
+    return sum + sale.cartItems.reduce((itemSum, item) => {
+      const product = products.find(p => p.id === item.id);
+      const cost = product?.cost ?? 0;
+      return itemSum + (item.price - cost) * item.qty;
+    }, 0);
+  }, 0);
+}, [todaySales, products]);
 ```
 
-### Razorpay Checkout SDK Loader
+### Edge Cases
 
-```typescript
-export function loadRazorpayCheckout(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if ((window as any).Razorpay) { resolve(); return; }
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load Razorpay"));
-    document.head.appendChild(script);
-  });
-}
-```
-
-### Per-Item GST in PDF
-
-```typescript
-// Enhanced items table with individual GST
-data.items.forEach((item) => {
-  const itemGst = item.gst ?? data.gstRate;
-  const gstAmt = Math.round(item.price * item.qty * itemGst / 100);
-  // Render: Name | Qty | Rate | GST% | GST Amt | Total
-});
-
-// Summary: Group by GST rate
-const gstGroups = groupBy(items, "gst");
-// Show: CGST 9%: X, SGST 9%: X for each rate
-```
-
-### Edge Cases Handled
-
-- **PDF generation fails on mobile**: Wrap in try/catch, show manual "Retry" button, sale is still saved without PDF
-- **Payment link creation fails offline**: Save sale without link, queue link creation for when online, mark with "Link pending" badge
-- **PDF too large**: Already using compressed images (max 800px, JPEG 0.7 quality from image-utils); invoice PDFs without embedded images stay under 100KB
-- **Razorpay script blocked by ad-blocker**: Detect load failure, fall back to payment link mode only
-- **Partial payment via Razorpay then customer pays more**: Update `paidAmount`, check if fully paid, regenerate PDF without QR if balance = 0
-- **Duplicate PDF generation**: Debounce -- check `pdfGeneratedAt` timestamp, skip if generated within last 5 seconds
+- **Photo storage bloat**: Each photo compressed to ~30-50KB; limit to 10 photos per job card with UI warning
+- **Part removed after stock decremented**: "Return Part" button adds stock back
+- **Job card deleted with parts used**: Warn user that stock won't be restored automatically
+- **Advance exceeds estimate**: Validate — cap at estimate total
+- **CSV with special characters**: Wrap all values in double quotes, escape inner quotes
+- **Profit calc without cost data**: Show "N/A" if products lack `cost` field
 
 ---
 
 ## Build Order
 
-1. Add `pdfDataUrl` and `pdfGeneratedAt` to Sale type in `offline-db.ts`
-2. Create `pdf-storage.ts` utility (store, retrieve, download)
-3. Update `generate-invoice-pdf.ts` (per-item GST, store profile, generateAndStorePDF)
-4. Update `payment-service.ts` (Razorpay SDK loader, edge function stubs)
-5. Update `POS.tsx` (auto-create payment link, store PDF, enhanced post-checkout)
-6. Update `QuickBillModal.tsx` (wire payment link + PDF storage)
-7. Update `Sales.tsx` (Download/Resend buttons per invoice)
-8. Update `Customers.tsx` (Download/Resend on invoice tab)
-
+1. Extend `JobCard` type in `offline-db.ts` (add optional fields — no schema version bump)
+2. Create `JobPhotos.tsx` (camera capture + gallery)
+3. Create `PartsSelector.tsx` (inventory-linked parts picker)
+4. Create `WorkLog.tsx` (timeline + add note)
+5. Create `JobInvoiceGenerator.tsx` (sale creation from job)
+6. Rewrite `JobCards.tsx` with all new components, status board toggle, advance payment
+7. Create `MetricCard.tsx` and `CSVExport.tsx` components
+8. Rewrite `Reports.tsx` with actionable cards, profit, CSV export, payment method chart
