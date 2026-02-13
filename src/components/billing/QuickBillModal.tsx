@@ -1,8 +1,8 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X, Search, Plus, Minus, Trash2, ArrowRight, ArrowLeft,
-  FileText, Send, CheckCircle, Percent, ShoppingBag, Zap
+  FileText, Send, CheckCircle, Percent, ShoppingBag, Zap, ScanBarcode
 } from "lucide-react";
 import { useProducts, useSales, useCustomers, type Product } from "@/hooks/use-local-store";
 
@@ -19,6 +19,9 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
   const { items: catalog } = useProducts();
   const { add: addSale } = useSales();
   const { items: customers, add: addCustomer, update: updateCustomer } = useCustomers();
+  const barcodeRef = useRef<HTMLInputElement>(null);
+  const [barcodeValue, setBarcodeValue] = useState("");
+  const [barcodeFeedback, setBarcodeFeedback] = useState<"idle" | "found" | "notfound">("idle");
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -56,6 +59,20 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
   const removeItem = useCallback((id: string) => {
     setCart((prev) => prev.filter((i) => i.id !== id));
   }, []);
+
+  const handleBarcodeScan = useCallback((value: string) => {
+    const trimmed = value.trim().toUpperCase();
+    if (!trimmed) return;
+    const match = catalog.find((p) => p.sku.toUpperCase() === trimmed);
+    if (match) {
+      addToCart(match);
+      setBarcodeFeedback("found");
+    } else {
+      setBarcodeFeedback("notfound");
+    }
+    setBarcodeValue("");
+    setTimeout(() => setBarcodeFeedback("idle"), 1500);
+  }, [catalog, addToCart]);
 
   const invoiceId = useMemo(() => `INV-${Date.now().toString(36).toUpperCase().slice(-6)}`, [billDone]);
 
@@ -204,6 +221,33 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
           <AnimatePresence mode="wait">
             {step === 1 && (
               <motion.div key="step1" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} className="space-y-3">
+                {/* Barcode scanner input */}
+                <div className={`relative rounded-xl border-2 transition-colors ${
+                  barcodeFeedback === "found" ? "border-brand-success bg-brand-success/5" :
+                  barcodeFeedback === "notfound" ? "border-destructive bg-destructive/5" :
+                  "border-accent/30 bg-accent/5"
+                }`}>
+                  <ScanBarcode className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-accent" />
+                  <input
+                    ref={barcodeRef}
+                    value={barcodeValue}
+                    onChange={(e) => setBarcodeValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleBarcodeScan(barcodeValue);
+                      }
+                    }}
+                    className="w-full h-11 pl-9 pr-20 rounded-xl bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                    placeholder="Scan barcode / SKU..."
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {barcodeFeedback === "found" ? "✅ Added!" :
+                     barcodeFeedback === "notfound" ? "❌ Not found" :
+                     "Enter ↵"}
+                  </span>
+                </div>
+
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <input
@@ -211,7 +255,6 @@ export default function QuickBillModal({ open, onClose }: QuickBillModalProps) {
                     onChange={(e) => setSearch(e.target.value)}
                     className="w-full h-11 pl-9 pr-4 rounded-xl glass text-sm text-foreground placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-primary/30 outline-none"
                     placeholder="Search products / सर्च करें..."
-                    autoFocus
                   />
                 </div>
 
