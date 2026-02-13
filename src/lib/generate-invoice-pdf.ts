@@ -1,10 +1,14 @@
 import jsPDF from "jspdf";
 import QRCode from "qrcode";
+import { db } from "@/lib/offline-db";
+import type { StoreProfile } from "@/lib/offline-db";
 
 interface InvoiceItem {
   name: string;
   qty: number;
   price: number;
+  gst?: number;
+  hsn?: string;
 }
 
 export interface InvoiceData {
@@ -32,6 +36,15 @@ function setColor(doc: jsPDF, r: number, g: number, b: number) {
   doc.setTextColor(r, g, b);
 }
 
+async function getStoreProfile(): Promise<StoreProfile | null> {
+  try {
+    const profiles = await db.storeProfile.toArray();
+    return profiles[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Main Generator ──
 export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
@@ -42,39 +55,57 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
   const rightEdge = w - m;
   let y = 12;
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // PAGE BORDER — subtle outer frame
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Fetch store profile for dynamic header
+  const store = await getStoreProfile();
+  const storeName = store?.name || "SHREE UMIYA ELECTRONICS";
+  const storeAddress = store?.address || "Shop No. 5, Sargasan Cross Road, Gandhinagar – 382421, Gujarat";
+  const storePhone = store?.phone || "+91 99999 99999";
+  const storeWhatsApp = store?.whatsapp || storePhone;
+
+  // ━━━ PAGE BORDER ━━━
   doc.setDrawColor(225, 228, 235);
   doc.setLineWidth(0.15);
   doc.rect(8, 5, w - 16, h - 10, "S");
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // HEADER — Authority Zone
-  // Left: Logo + Business info | Right: Invoice meta
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  // Logo monogram — royal blue circle with white "U"
+  // ━━━ HEADER ━━━
   const logoSize = 13;
   const logoCx = m + logoSize / 2;
   const logoCy = y + logoSize / 2 + 1;
-  doc.setFillColor(42, 72, 188);
-  doc.circle(logoCx, logoCy, logoSize / 2, "F");
-  // Inner ring
-  doc.setDrawColor(255, 255, 255);
-  doc.setLineWidth(0.6);
-  doc.circle(logoCx, logoCy, logoSize / 2 - 1.5, "S");
-  setColor(doc, 255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.text("U", logoCx, logoCy + 1.8, { align: "center" });
+
+  // Logo — try store logo or fallback to monogram
+  if (store?.logo) {
+    try {
+      doc.addImage(store.logo, "JPEG", m, y, logoSize, logoSize);
+    } catch {
+      // Fallback monogram
+      doc.setFillColor(42, 72, 188);
+      doc.circle(logoCx, logoCy, logoSize / 2, "F");
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(0.6);
+      doc.circle(logoCx, logoCy, logoSize / 2 - 1.5, "S");
+      setColor(doc, 255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.text(storeName[0], logoCx, logoCy + 1.8, { align: "center" });
+    }
+  } else {
+    doc.setFillColor(42, 72, 188);
+    doc.circle(logoCx, logoCy, logoSize / 2, "F");
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(0.6);
+    doc.circle(logoCx, logoCy, logoSize / 2 - 1.5, "S");
+    setColor(doc, 255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text(storeName[0], logoCx, logoCy + 1.8, { align: "center" });
+  }
 
   // Business name
   const bx = m + logoSize + 5;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
   setColor(doc, 25, 35, 72);
-  doc.text("SHREE UMIYA ELECTRONICS", bx, y + 6);
+  doc.text(storeName.toUpperCase(), bx, y + 6);
 
   // Tagline
   doc.setFont("helvetica", "normal");
@@ -85,8 +116,8 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
   // Contact details
   doc.setFontSize(6.2);
   setColor(doc, 110, 118, 140);
-  doc.text("Shop No. 5, Sargasan Cross Road, Gandhinagar – 382421, Gujarat", bx, y + 16);
-  doc.text("Ph: +91 99999 99999  ·  Email: info@umiyaelectronics.com  ·  GSTIN: 24AXXXX1234X1Z5", bx, y + 20);
+  doc.text(storeAddress, bx, y + 16);
+  doc.text(`Ph: ${storePhone}  ·  Email: info@umiyaelectronics.com  ·  GSTIN: 24AXXXX1234X1Z5`, bx, y + 20);
 
   // Right side — Invoice meta block
   doc.setFont("helvetica", "bold");
@@ -122,7 +153,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
 
   y += 28;
 
-  // Header divider — thin premium line
+  // Header divider
   doc.setDrawColor(42, 72, 188);
   doc.setLineWidth(0.5);
   doc.line(m, y, rightEdge, y);
@@ -131,18 +162,14 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
   doc.line(m, y + 0.8, rightEdge, y + 0.8);
   y += 6;
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // TAX INVOICE TITLE
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ━━━ TAX INVOICE TITLE ━━━
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   setColor(doc, 25, 35, 72);
   doc.text("TAX INVOICE", m, y + 1);
   y += 8;
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // CUSTOMER — Clean, no box (Trust Section)
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ━━━ CUSTOMER ━━━
   if (data.customerName && data.customerName !== "Walk-in") {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(6.5);
@@ -164,16 +191,14 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
       y += 4;
     }
 
-    y += 6; // generous spacing
+    y += 6;
   } else {
     y += 3;
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // ITEMS TABLE — Premium minimal borders
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ━━━ ITEMS TABLE — Per-item GST ━━━
+  const hasPerItemGst = data.items.some((item) => item.gst !== undefined);
 
-  // Column positions
   const c1 = m + 2;           // Item Name
   const c2 = m + cw * 0.52;   // Qty
   const c3 = m + cw * 0.65;   // Price
@@ -193,12 +218,21 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
   doc.text("AMOUNT", c5, y + 5, { align: "right" });
   y += 10;
 
-  // Rows — light separators, no heavy borders
+  // Collect GST breakdown by rate
+  const gstBreakdown: Record<number, number> = {};
+
   data.items.forEach((item, i) => {
     const amount = item.price * item.qty;
-    const gstPerItem = data.gstRate > 0 ? `${data.gstRate}%` : "—";
+    const itemGstRate = hasPerItemGst ? (item.gst ?? data.gstRate) : data.gstRate;
+    const gstPerItem = itemGstRate > 0 ? `${itemGstRate}%` : "—";
+    const itemGstAmount = Math.round(item.price * item.qty * itemGstRate / 100);
 
-    // Zebra striping — very subtle
+    // Accumulate GST by rate
+    if (itemGstRate > 0) {
+      gstBreakdown[itemGstRate] = (gstBreakdown[itemGstRate] || 0) + itemGstAmount;
+    }
+
+    // Zebra striping
     if (i % 2 === 0) {
       doc.setFillColor(248, 249, 253);
       doc.rect(m, y - 3.5, cw, 7.5, "F");
@@ -230,10 +264,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
 
   y += 4;
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // AMOUNT SUMMARY — Right aligned (Visual Power Area)
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+  // ━━━ AMOUNT SUMMARY ━━━
   const sumLabelX = rightEdge - 60;
   const sumValX = c5;
 
@@ -246,8 +277,28 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
   doc.text(fmt(data.subtotal), sumValX, y, { align: "right" });
   y += 5.5;
 
-  // GST
-  if (data.gstAmount > 0) {
+  // GST breakdown by rate
+  const gstRates = Object.keys(gstBreakdown).map(Number).sort();
+  if (gstRates.length > 0) {
+    for (const rate of gstRates) {
+      const halfRate = rate / 2;
+      const totalGstForRate = gstBreakdown[rate];
+      const halfGst = Math.round(totalGstForRate / 2);
+
+      setColor(doc, 110, 118, 140);
+      doc.text(`CGST ${halfRate}%`, sumLabelX, y);
+      setColor(doc, 45, 52, 70);
+      doc.text(fmt(halfGst), sumValX, y, { align: "right" });
+      y += 4.5;
+
+      setColor(doc, 110, 118, 140);
+      doc.text(`SGST ${halfRate}%`, sumLabelX, y);
+      setColor(doc, 45, 52, 70);
+      doc.text(fmt(totalGstForRate - halfGst), sumValX, y, { align: "right" });
+      y += 4.5;
+    }
+  } else if (data.gstAmount > 0) {
+    // Fallback: flat GST
     setColor(doc, 110, 118, 140);
     doc.text(`GST (${data.gstRate}%)`, sumLabelX, y);
     setColor(doc, 45, 52, 70);
@@ -271,10 +322,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
   doc.text(fmt(data.total), sumValX, y + 2.5, { align: "right" });
   y += 14;
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // PAYMENT STATUS AREA
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+  // ━━━ PAYMENT STATUS AREA ━━━
   const remaining = data.total - data.paidAmount;
 
   // Paid amount
@@ -287,7 +335,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
   doc.text(fmt(data.paidAmount), sumValX, y, { align: "right" });
   y += 5.5;
 
-  // Remaining balance (bold, orange/red)
+  // Remaining balance
   if (remaining > 0) {
     setColor(doc, 110, 118, 140);
     doc.setFont("helvetica", "normal");
@@ -298,17 +346,12 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
     doc.text(fmt(remaining), sumValX, y, { align: "right" });
     y += 10;
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // PAYMENT BOX — QR left, text right
-    // Only when balance > 0
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+    // ━━━ PAYMENT BOX — QR left, text right ━━━
     const paymentLink = data.paymentLink || `https://rzp.io/i/${data.invoiceId.slice(-8).toLowerCase()}`;
     const boxY = y;
     const boxH = 48;
-    const qrSize = 32; // ~120-150px at 96dpi
+    const qrSize = 32;
 
-    // Box background & border
     doc.setFillColor(255, 252, 248);
     doc.roundedRect(m, boxY, cw, boxH, 2.5, 2.5, "F");
     doc.setDrawColor(230, 145, 56);
@@ -319,7 +362,6 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
     doc.setFillColor(230, 145, 56);
     doc.rect(m, boxY, cw, 1, "F");
 
-    // Pending amount label — left of QR
     const qrX = m + 6;
     const qrY = boxY + 7;
 
@@ -400,20 +442,14 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
     y += 14;
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // DIGITAL NOTICE
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ━━━ DIGITAL NOTICE ━━━
   doc.setFont("helvetica", "italic");
   doc.setFontSize(5.8);
   setColor(doc, 170, 175, 190);
   doc.text("Digitally Generated Invoice — No Signature Required", w / 2, y, { align: "center" });
   y += 8;
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // TRUST FOOTER — Brand Builder
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  // Divider
+  // ━━━ TRUST FOOTER ━━━
   doc.setDrawColor(210, 215, 225);
   doc.setLineWidth(0.2);
   doc.line(m, y, rightEdge, y);
@@ -422,13 +458,13 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7);
   setColor(doc, 90, 98, 120);
-  doc.text("Thank you for choosing Shree Umiya Electronics!", w / 2, y, { align: "center" });
+  doc.text(`Thank you for choosing ${store?.name || "Shree Umiya Electronics"}!`, w / 2, y, { align: "center" });
   y += 4;
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6);
   setColor(doc, 150, 155, 170);
-  doc.text("For service support, contact us on WhatsApp: +91 99999 99999", w / 2, y, { align: "center" });
+  doc.text(`For service support, contact us on WhatsApp: ${storeWhatsApp}`, w / 2, y, { align: "center" });
   y += 4;
   doc.text("Terms: Services carry 30-day warranty. Products as per manufacturer warranty.", w / 2, y, { align: "center" });
   y += 5;
@@ -437,6 +473,13 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
   doc.setFontSize(5.5);
   setColor(doc, 180, 185, 200);
   doc.text("Trusted Electronics Experts Since 2005", w / 2, y, { align: "center" });
+
+  // PDF metadata
+  doc.setProperties({
+    title: `Invoice ${data.invoiceId}`,
+    subject: `Invoice for ${data.customerName}`,
+    creator: store?.name || "DukaanOS",
+  });
 
   return doc;
 }
@@ -449,4 +492,14 @@ export async function downloadInvoicePDF(data: InvoiceData) {
 export async function getInvoicePDFBlob(data: InvoiceData): Promise<Blob> {
   const doc = await generateInvoicePDF(data);
   return doc.output("blob");
+}
+
+/**
+ * Generate PDF, store it in IndexedDB, and return the blob.
+ */
+export async function generateAndStorePDF(data: InvoiceData, saleId: string): Promise<Blob> {
+  const { storePDF } = await import("@/lib/pdf-storage");
+  const blob = await getInvoicePDFBlob(data);
+  await storePDF(saleId, blob);
+  return blob;
 }

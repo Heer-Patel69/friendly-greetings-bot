@@ -81,6 +81,8 @@ export interface Sale {
   paymentLinkId?: string;
   razorpayPaymentId?: string;
   qrRef?: string;
+  pdfDataUrl?: string;
+  pdfGeneratedAt?: number;
 }
 
 export interface Favorite {

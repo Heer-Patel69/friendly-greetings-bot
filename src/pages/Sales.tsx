@@ -1,12 +1,15 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageShell } from "@/components/layout/PageShell";
-import { ShoppingCart, FileText, Zap, IndianRupee, CreditCard, Link2 } from "lucide-react";
+import { ShoppingCart, FileText, Zap, IndianRupee, CreditCard, Link2, Download, MessageCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import PaymentModal from "@/components/payment/PaymentModal";
 import PaymentStatusBadge from "@/components/payment/PaymentStatusBadge";
 import { useSales } from "@/hooks/use-offline-store";
 import { useI18n } from "@/hooks/use-i18n";
+import { downloadStoredPDF } from "@/lib/pdf-storage";
+import { downloadInvoicePDF } from "@/lib/generate-invoice-pdf";
+import { toast } from "sonner";
 import type { Sale } from "@/hooks/use-offline-store";
 
 export default function Sales() {
@@ -34,6 +37,42 @@ export default function Sales() {
   const handlePaymentSuccess = (sale: Sale) => {
     update(sale.id, { paidAmount: sale.amount, status: "Paid" });
     setPaymentTarget(null);
+  };
+
+  const handleDownloadPDF = async (sale: Sale) => {
+    const stored = await downloadStoredPDF(sale.id);
+    if (stored) {
+      toast.success("PDF downloaded!");
+      return;
+    }
+    // Regenerate if no stored PDF
+    const items = sale.cartItems
+      ? sale.cartItems.map((i) => ({ name: i.name, qty: i.qty, price: i.price }))
+      : sale.items.split(", ").map((n) => ({ name: n, qty: 1, price: sale.amount }));
+    await downloadInvoicePDF({
+      invoiceId: sale.id,
+      date: sale.date,
+      customerName: sale.customer,
+      customerPhone: sale.customerPhone,
+      items,
+      subtotal: sale.amount,
+      gstRate: 0,
+      gstAmount: 0,
+      total: sale.amount,
+      paidAmount: sale.paidAmount,
+      status: sale.status,
+      paymentLink: sale.paymentLink,
+    });
+    toast.success("PDF generated!");
+  };
+
+  const handleResendWhatsApp = (sale: Sale) => {
+    const remaining = sale.amount - sale.paidAmount;
+    const ph = sale.customerPhone.replace(/\D/g, "");
+    const msg = encodeURIComponent(
+      `🧾 Invoice ${sale.id}\nTotal: ₹${sale.amount.toLocaleString("en-IN")}\nPaid: ₹${sale.paidAmount.toLocaleString("en-IN")}\n${remaining > 0 ? `Balance: ₹${remaining.toLocaleString("en-IN")}${sale.paymentLink ? `\n\n💳 Pay Online: ${sale.paymentLink}` : ""}` : "✅ Fully Paid"}\n\n— Shree Umiya Electronics`
+    );
+    window.open(ph ? `https://wa.me/${ph}?text=${msg}` : `https://wa.me/?text=${msg}`, "_blank");
   };
 
   return (
@@ -87,25 +126,43 @@ export default function Sales() {
                   </div>
                 </div>
 
-                {/* Pay Now / Send Link actions for unpaid */}
-                {sale.status !== "Paid" && remaining > 0 && (
-                  <div className="flex gap-2 mt-3 pt-3 border-t border-border/30">
-                    <motion.button
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => openPayment(sale, "checkout")}
-                      className="flex-1 h-9 rounded-xl gradient-accent text-accent-foreground text-[11px] font-bold flex items-center justify-center gap-1.5 hover:brightness-110 transition-all"
-                    >
-                      <CreditCard className="h-3.5 w-3.5" /> Pay Now ₹{remaining.toLocaleString("en-IN")}
-                    </motion.button>
-                    <motion.button
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => openPayment(sale, "link")}
-                      className="h-9 px-3 rounded-xl glass text-primary text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-primary/10 transition-colors border border-primary/20"
-                    >
-                      <Link2 className="h-3.5 w-3.5" /> Send Link
-                    </motion.button>
-                  </div>
-                )}
+                {/* Invoice actions: Download PDF + Resend WhatsApp */}
+                <div className="flex gap-2 mt-3 pt-3 border-t border-border/30">
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleDownloadPDF(sale)}
+                    className="h-9 px-3 rounded-xl glass text-foreground text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-card/80 transition-colors border border-border/30"
+                  >
+                    <Download className="h-3.5 w-3.5 text-primary" /> PDF
+                  </motion.button>
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleResendWhatsApp(sale)}
+                    className="h-9 px-3 rounded-xl bg-[hsl(142,70%,40%)]/10 text-[hsl(142,70%,40%)] text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-[hsl(142,70%,40%)]/15 transition-colors border border-[hsl(142,70%,40%)]/20"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" /> Resend
+                  </motion.button>
+
+                  {/* Pay Now / Send Link actions for unpaid */}
+                  {sale.status !== "Paid" && remaining > 0 && (
+                    <>
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => openPayment(sale, "checkout")}
+                        className="flex-1 h-9 rounded-xl gradient-accent text-accent-foreground text-[11px] font-bold flex items-center justify-center gap-1.5 hover:brightness-110 transition-all"
+                      >
+                        <CreditCard className="h-3.5 w-3.5" /> Pay ₹{remaining.toLocaleString("en-IN")}
+                      </motion.button>
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => openPayment(sale, "link")}
+                        className="h-9 px-3 rounded-xl glass text-primary text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-primary/10 transition-colors border border-primary/20"
+                      >
+                        <Link2 className="h-3.5 w-3.5" />
+                      </motion.button>
+                    </>
+                  )}
+                </div>
               </div>
             );
           })}
