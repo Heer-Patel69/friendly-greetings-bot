@@ -12,6 +12,7 @@ export interface InvoiceData {
   date: string;
   customerName: string;
   customerPhone: string;
+  customerId?: string;
   items: InvoiceItem[];
   subtotal: number;
   gstRate: number;
@@ -22,352 +23,420 @@ export interface InvoiceData {
   paymentLink?: string;
 }
 
-// ── Logo as base64 (small "U" monogram for PDF embedding) ──
-function drawLogo(doc: jsPDF, x: number, y: number, size: number) {
-  // Draw a branded circle with "U" monogram
-  const cx = x + size / 2;
-  const cy = y + size / 2;
-  const r = size / 2;
-
-  // Blue circle background
-  doc.setFillColor(59, 91, 219); // Royal Blue
-  doc.circle(cx, cy, r, "F");
-
-  // White "U" letter
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(size * 1.8);
-  doc.text("U", cx, cy + size * 0.3, { align: "center" });
-  doc.setTextColor(0, 0, 0);
-}
-
 // ── Helpers ──
-function drawLine(doc: jsPDF, y: number, margin: number, w: number, color = [220, 220, 220]) {
-  doc.setDrawColor(color[0], color[1], color[2]);
-  doc.setLineWidth(0.3);
-  doc.line(margin, y, w - margin, y);
-}
-
 function fmt(n: number): string {
   return `₹${n.toLocaleString("en-IN")}`;
+}
+
+function setColor(doc: jsPDF, r: number, g: number, b: number) {
+  doc.setTextColor(r, g, b);
 }
 
 // ── Main Generator ──
 export async function generateInvoicePDF(data: InvoiceData): Promise<jsPDF> {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const w = doc.internal.pageSize.getWidth();
-  const margin = 18;
-  const contentW = w - margin * 2;
-  let y = 15;
+  const h = doc.internal.pageSize.getHeight();
+  const m = 16; // margin
+  const cw = w - m * 2; // content width
+  const rightEdge = w - m;
+  let y = 12;
 
-  // ═══════════════════════════════════════
-  // HEADER BLOCK — Logo + Business Info
-  // ═══════════════════════════════════════
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // PAGE BORDER — subtle outer frame
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  doc.setDrawColor(225, 228, 235);
+  doc.setLineWidth(0.15);
+  doc.rect(8, 5, w - 16, h - 10, "S");
 
-  // Header background
-  doc.setFillColor(248, 249, 252);
-  doc.roundedRect(margin - 3, y - 5, contentW + 6, 38, 3, 3, "F");
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // HEADER — Authority Zone
+  // Left: Logo + Business info | Right: Invoice meta
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  // Logo
-  drawLogo(doc, margin, y - 1, 14);
+  // Logo monogram — royal blue circle with white "U"
+  const logoSize = 13;
+  const logoCx = m + logoSize / 2;
+  const logoCy = y + logoSize / 2 + 1;
+  doc.setFillColor(42, 72, 188);
+  doc.circle(logoCx, logoCy, logoSize / 2, "F");
+  // Inner ring
+  doc.setDrawColor(255, 255, 255);
+  doc.setLineWidth(0.6);
+  doc.circle(logoCx, logoCy, logoSize / 2 - 1.5, "S");
+  setColor(doc, 255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.text("U", logoCx, logoCy + 1.8, { align: "center" });
 
   // Business name
-  const textX = margin + 18;
+  const bx = m + logoSize + 5;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.setTextColor(30, 41, 82);
-  doc.text("SHREE UMIYA ELECTRONICS", textX, y + 5);
+  doc.setFontSize(14);
+  setColor(doc, 25, 35, 72);
+  doc.text("SHREE UMIYA ELECTRONICS", bx, y + 6);
 
   // Tagline
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
-  doc.setTextColor(120, 130, 155);
-  doc.text("Established 2005  •  20,000+ Problems Solved  •  Trusted Service Experts", textX, y + 10);
+  doc.setFontSize(6.5);
+  setColor(doc, 130, 140, 165);
+  doc.text("Established 2005  ·  20,000+ Problems Solved  ·  Trusted Electronics Experts", bx, y + 11);
 
-  // Address line
-  doc.setFontSize(7);
-  doc.text("Shop No. 5, Sargasan Cross Road, Gandhinagar - 382421, Gujarat", textX, y + 15);
-  doc.text("Phone: +91 99999 99999  |  GSTIN: 24AXXXX1234X1Z5", textX, y + 19.5);
+  // Contact details
+  doc.setFontSize(6.2);
+  setColor(doc, 110, 118, 140);
+  doc.text("Shop No. 5, Sargasan Cross Road, Gandhinagar – 382421, Gujarat", bx, y + 16);
+  doc.text("Ph: +91 99999 99999  ·  Email: info@umiyaelectronics.com  ·  GSTIN: 24AXXXX1234X1Z5", bx, y + 20);
 
-  // Invoice number — right aligned
+  // Right side — Invoice meta block
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(59, 91, 219);
-  doc.text(data.invoiceId, w - margin, y + 3, { align: "right" });
+  doc.setFontSize(7.5);
+  setColor(doc, 42, 72, 188);
+  doc.text("INVOICE", rightEdge, y + 3, { align: "right" });
+
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
-  doc.setTextColor(100, 110, 130);
-  doc.text(`Date: ${data.date}`, w - margin, y + 8, { align: "right" });
-
-  // Status pill — top right
-  const statusColors: Record<string, [number, number, number]> = {
-    Paid: [22, 163, 74],
-    Partial: [202, 138, 4],
-    Pending: [220, 53, 69],
-  };
-  const sc = statusColors[data.status] || [100, 100, 100];
-  const statusText = data.status.toUpperCase();
-  const stW = doc.getTextWidth(statusText) + 8;
-  doc.setFillColor(sc[0], sc[1], sc[2]);
-  doc.roundedRect(w - margin - stW, y + 12, stW + 4, 6.5, 2, 2, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
   doc.setFontSize(7);
-  doc.text(statusText, w - margin - stW + (stW + 4) / 2, y + 16.2, { align: "center" });
+  setColor(doc, 80, 88, 110);
+  doc.text(`No: ${data.invoiceId}`, rightEdge, y + 8, { align: "right" });
+  doc.text(`Date: ${data.date}`, rightEdge, y + 12.5, { align: "right" });
+  if (data.customerId) {
+    doc.text(`Cust ID: ${data.customerId}`, rightEdge, y + 17, { align: "right" });
+  }
 
-  doc.setTextColor(0, 0, 0);
-  y += 40;
-
-  // ═══════════════════════════════════════
-  // TAX INVOICE TITLE + CUSTOMER
-  // ═══════════════════════════════════════
-
+  // Status pill
+  const statusCfg: Record<string, { bg: [number, number, number]; label: string }> = {
+    Paid: { bg: [22, 163, 74], label: "PAID" },
+    Partial: { bg: [202, 138, 4], label: "PARTIAL" },
+    Pending: { bg: [220, 53, 69], label: "UNPAID" },
+  };
+  const st = statusCfg[data.status] || statusCfg.Pending;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.setTextColor(30, 41, 82);
-  doc.text("TAX INVOICE", margin, y);
+  doc.setFontSize(6);
+  const pillW = doc.getTextWidth(st.label) + 6;
+  const pillX = rightEdge - pillW;
+  const pillY = y + 19.5;
+  doc.setFillColor(st.bg[0], st.bg[1], st.bg[2]);
+  doc.roundedRect(pillX, pillY, pillW, 5, 1.5, 1.5, "F");
+  setColor(doc, 255, 255, 255);
+  doc.text(st.label, pillX + pillW / 2, pillY + 3.5, { align: "center" });
+
+  y += 28;
+
+  // Header divider — thin premium line
+  doc.setDrawColor(42, 72, 188);
+  doc.setLineWidth(0.5);
+  doc.line(m, y, rightEdge, y);
+  doc.setDrawColor(220, 225, 235);
+  doc.setLineWidth(0.15);
+  doc.line(m, y + 0.8, rightEdge, y + 0.8);
+  y += 6;
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // TAX INVOICE TITLE
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  setColor(doc, 25, 35, 72);
+  doc.text("TAX INVOICE", m, y + 1);
   y += 8;
 
-  // Customer block
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // CUSTOMER — Clean, no box (Trust Section)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   if (data.customerName && data.customerName !== "Walk-in") {
-    doc.setFillColor(252, 252, 255);
-    doc.roundedRect(margin, y - 3, contentW, 18, 2, 2, "F");
-    doc.setDrawColor(230, 232, 240);
-    doc.roundedRect(margin, y - 3, contentW, 18, 2, 2, "S");
-
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
-    doc.setTextColor(120, 130, 155);
-    doc.text("BILL TO", margin + 4, y + 2);
+    doc.setFontSize(6.5);
+    setColor(doc, 130, 140, 165);
+    doc.text("BILL TO", m, y);
+    y += 5;
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
-    doc.setTextColor(30, 41, 82);
-    doc.text(data.customerName, margin + 4, y + 7.5);
+    setColor(doc, 25, 35, 72);
+    doc.text(data.customerName, m, y);
+    y += 5;
 
     if (data.customerPhone) {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
-      doc.setTextColor(100, 110, 130);
-      doc.text(`Phone: ${data.customerPhone}`, margin + 4, y + 12);
+      setColor(doc, 90, 98, 120);
+      doc.text(`Phone: ${data.customerPhone}`, m, y);
+      y += 4;
     }
-    y += 22;
+
+    y += 6; // generous spacing
   } else {
-    y += 2;
+    y += 3;
   }
 
-  // ═══════════════════════════════════════
-  // ITEMS TABLE
-  // ═══════════════════════════════════════
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ITEMS TABLE — Premium minimal borders
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  // Table header
-  const colItem = margin + 3;
-  const colQty = w - margin - 65;
-  const colRate = w - margin - 35;
-  const colAmt = w - margin - 3;
+  // Column positions
+  const c1 = m + 2;           // Item Name
+  const c2 = m + cw * 0.52;   // Qty
+  const c3 = m + cw * 0.65;   // Price
+  const c4 = m + cw * 0.80;   // GST %
+  const c5 = rightEdge - 2;   // Total
 
-  doc.setFillColor(59, 91, 219);
-  doc.roundedRect(margin, y, contentW, 8, 1.5, 1.5, "F");
+  // Dark header
+  doc.setFillColor(30, 40, 75);
+  doc.rect(m, y, cw, 7.5, "F");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
-  doc.setTextColor(255, 255, 255);
-  doc.text("ITEM DESCRIPTION", colItem, y + 5.5);
-  doc.text("QTY", colQty, y + 5.5, { align: "center" });
-  doc.text("RATE", colRate, y + 5.5, { align: "right" });
-  doc.text("AMOUNT", colAmt, y + 5.5, { align: "right" });
-  y += 12;
+  doc.setFontSize(6.5);
+  setColor(doc, 255, 255, 255);
+  doc.text("ITEM DESCRIPTION", c1, y + 5);
+  doc.text("QTY", c2, y + 5, { align: "center" });
+  doc.text("RATE", c3, y + 5, { align: "right" });
+  doc.text("GST %", c4, y + 5, { align: "right" });
+  doc.text("AMOUNT", c5, y + 5, { align: "right" });
+  y += 10;
 
-  // Table rows
-  doc.setTextColor(50, 55, 70);
+  // Rows — light separators, no heavy borders
   data.items.forEach((item, i) => {
     const amount = item.price * item.qty;
-    const rowY = y;
+    const gstPerItem = data.gstRate > 0 ? `${data.gstRate}%` : "—";
 
-    // Alternating row bg
+    // Zebra striping — very subtle
     if (i % 2 === 0) {
-      doc.setFillColor(250, 250, 253);
-      doc.rect(margin, rowY - 3.5, contentW, 8, "F");
+      doc.setFillColor(248, 249, 253);
+      doc.rect(m, y - 3.5, cw, 7.5, "F");
     }
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.text(item.name, colItem, rowY);
-    doc.text(String(item.qty), colQty, rowY, { align: "center" });
     doc.setFontSize(8);
-    doc.text(fmt(item.price), colRate, rowY, { align: "right" });
+    setColor(doc, 45, 52, 70);
+    doc.text(item.name, c1, y);
+
+    doc.setFontSize(7.5);
+    setColor(doc, 80, 88, 110);
+    doc.text(String(item.qty), c2, y, { align: "center" });
+    doc.text(fmt(item.price), c3, y, { align: "right" });
+    doc.text(gstPerItem, c4, y, { align: "right" });
+
     doc.setFont("helvetica", "bold");
-    doc.text(fmt(amount), colAmt, rowY, { align: "right" });
-    y += 8;
+    doc.setFontSize(8);
+    setColor(doc, 45, 52, 70);
+    doc.text(fmt(amount), c5, y, { align: "right" });
+
+    y += 7.5;
+
+    // Light row separator
+    doc.setDrawColor(235, 238, 245);
+    doc.setLineWidth(0.1);
+    doc.line(m, y - 3, rightEdge, y - 3);
   });
 
-  y += 2;
-  drawLine(doc, y, margin, w);
-  y += 8;
+  y += 4;
 
-  // ═══════════════════════════════════════
-  // TOTALS SECTION
-  // ═══════════════════════════════════════
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // AMOUNT SUMMARY — Right aligned (Visual Power Area)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  const totLabelX = w - margin - 58;
-  const totValX = colAmt;
+  const sumLabelX = rightEdge - 60;
+  const sumValX = c5;
 
+  // Subtotal
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(100, 110, 130);
-  doc.text("Subtotal", totLabelX, y);
-  doc.setTextColor(50, 55, 70);
-  doc.text(fmt(data.subtotal), totValX, y, { align: "right" });
-  y += 6;
+  doc.setFontSize(8);
+  setColor(doc, 110, 118, 140);
+  doc.text("Subtotal", sumLabelX, y);
+  setColor(doc, 45, 52, 70);
+  doc.text(fmt(data.subtotal), sumValX, y, { align: "right" });
+  y += 5.5;
 
+  // GST
   if (data.gstAmount > 0) {
-    doc.setTextColor(100, 110, 130);
-    doc.text(`GST (${data.gstRate}%)`, totLabelX, y);
-    doc.setTextColor(50, 55, 70);
-    doc.text(fmt(data.gstAmount), totValX, y, { align: "right" });
-    y += 6;
+    setColor(doc, 110, 118, 140);
+    doc.text(`GST (${data.gstRate}%)`, sumLabelX, y);
+    setColor(doc, 45, 52, 70);
+    doc.text(fmt(data.gstAmount), sumValX, y, { align: "right" });
+    y += 5.5;
   }
 
-  // Total row — highlighted
-  doc.setFillColor(59, 91, 219);
-  doc.roundedRect(totLabelX - 5, y - 3.5, colAmt - totLabelX + 8, 10, 2, 2, "F");
+  // Divider before Grand Total
+  doc.setDrawColor(42, 72, 188);
+  doc.setLineWidth(0.3);
+  doc.line(sumLabelX - 2, y, rightEdge, y);
+  y += 5;
+
+  // Grand Total — highlighted bar
+  doc.setFillColor(42, 72, 188);
+  doc.roundedRect(sumLabelX - 4, y - 4, rightEdge - sumLabelX + 6, 10, 1.5, 1.5, "F");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(255, 255, 255);
-  doc.text("TOTAL", totLabelX, y + 3);
-  doc.text(fmt(data.total), totValX, y + 3, { align: "right" });
-  y += 16;
+  doc.setFontSize(10);
+  setColor(doc, 255, 255, 255);
+  doc.text("GRAND TOTAL", sumLabelX, y + 2.5);
+  doc.text(fmt(data.total), sumValX, y + 2.5, { align: "right" });
+  y += 14;
 
-  // ═══════════════════════════════════════
-  // PAYMENT SUMMARY
-  // ═══════════════════════════════════════
-
-  doc.setTextColor(50, 55, 70);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-
-  doc.text("Amount Paid:", totLabelX, y);
-  doc.setTextColor(22, 163, 74);
-  doc.setFont("helvetica", "bold");
-  doc.text(fmt(data.paidAmount), totValX, y, { align: "right" });
-  y += 6;
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // PAYMENT STATUS AREA
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   const remaining = data.total - data.paidAmount;
 
+  // Paid amount
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  setColor(doc, 110, 118, 140);
+  doc.text("Paid Amount", sumLabelX, y);
+  doc.setFont("helvetica", "bold");
+  setColor(doc, 22, 163, 74);
+  doc.text(fmt(data.paidAmount), sumValX, y, { align: "right" });
+  y += 5.5;
+
+  // Remaining balance (bold, orange/red)
   if (remaining > 0) {
-    doc.setTextColor(220, 53, 69);
+    setColor(doc, 110, 118, 140);
+    doc.setFont("helvetica", "normal");
+    doc.text("Remaining Balance", sumLabelX, y);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    doc.text("Balance Due:", totLabelX, y);
-    doc.text(fmt(remaining), totValX, y, { align: "right" });
-    y += 12;
+    setColor(doc, 220, 80, 40);
+    doc.text(fmt(remaining), sumValX, y, { align: "right" });
+    y += 10;
 
-    // ═══════════════════════════════════════
-    // PAYMENT BOX — QR + Link (only when balance > 0)
-    // ═══════════════════════════════════════
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // PAYMENT BOX — QR left, text right
+    // Only when balance > 0
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    const paymentLink = data.paymentLink || `https://rzp.io/i/${data.invoiceId.slice(-8)}`;
-
-    // Payment box
+    const paymentLink = data.paymentLink || `https://rzp.io/i/${data.invoiceId.slice(-8).toLowerCase()}`;
     const boxY = y;
-    const boxH = 52;
-    doc.setFillColor(255, 251, 245);
-    doc.roundedRect(margin, boxY, contentW, boxH, 3, 3, "F");
-    doc.setDrawColor(237, 137, 54);
-    doc.setLineWidth(0.5);
-    doc.roundedRect(margin, boxY, contentW, boxH, 3, 3, "S");
+    const boxH = 48;
+    const qrSize = 32; // ~120-150px at 96dpi
 
-    // Payment box header
-    doc.setFillColor(237, 137, 54);
-    doc.roundedRect(margin + 2, boxY + 2, contentW - 4, 8, 2, 2, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text("💳  PAY REMAINING BALANCE ONLINE", margin + contentW / 2, boxY + 7.2, { align: "center" });
+    // Box background & border
+    doc.setFillColor(255, 252, 248);
+    doc.roundedRect(m, boxY, cw, boxH, 2.5, 2.5, "F");
+    doc.setDrawColor(230, 145, 56);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(m, boxY, cw, boxH, 2.5, 2.5, "S");
 
-    // QR code
+    // Orange accent bar at top
+    doc.setFillColor(230, 145, 56);
+    doc.rect(m, boxY, cw, 1, "F");
+
+    // Pending amount label — left of QR
+    const qrX = m + 6;
+    const qrY = boxY + 7;
+
+    // QR Code
     try {
       const qrDataUrl = await QRCode.toDataURL(paymentLink, {
-        width: 200,
+        width: 300,
         margin: 1,
-        color: { dark: "#1E2952", light: "#FFFFFF" },
+        color: { dark: "#1A2548", light: "#FFFFFF" },
+        errorCorrectionLevel: "M",
       });
-      doc.addImage(qrDataUrl, "PNG", margin + 8, boxY + 14, 28, 28);
+      doc.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
     } catch {
-      // QR generation failed — show placeholder
-      doc.setFillColor(240, 240, 245);
-      doc.rect(margin + 8, boxY + 14, 28, 28, "F");
-      doc.setTextColor(150, 150, 160);
+      doc.setFillColor(240, 242, 248);
+      doc.rect(qrX, qrY, qrSize, qrSize, "F");
+      setColor(doc, 150, 155, 170);
       doc.setFontSize(6);
-      doc.text("QR Code", margin + 22, boxY + 30, { align: "center" });
+      doc.text("[QR Code]", qrX + qrSize / 2, qrY + qrSize / 2, { align: "center" });
     }
 
-    // Payment details beside QR
-    const detailX = margin + 42;
-    let detailY = boxY + 18;
+    // "Scan to Pay" below QR
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.5);
+    setColor(doc, 42, 72, 188);
+    doc.text("Scan to Pay", qrX + qrSize / 2, qrY + qrSize + 4, { align: "center" });
 
-    doc.setTextColor(50, 55, 70);
+    // Right side text
+    const txX = qrX + qrSize + 10;
+    let txY = boxY + 10;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    setColor(doc, 220, 80, 40);
+    doc.text(`Pending Amount: ${fmt(remaining)}`, txX, txY);
+    txY += 7;
+
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
-    doc.text("Scan the QR code or use the link below", detailX, detailY);
-    detailY += 4.5;
-    doc.text("to clear the pending balance securely.", detailX, detailY);
-    detailY += 7;
+    setColor(doc, 70, 78, 100);
+    doc.text("Scan the QR code or use the payment link", txX, txY);
+    txY += 4.5;
+    doc.text("below to clear the pending balance.", txX, txY);
+    txY += 8;
 
+    // Pay Now label
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(220, 53, 69);
-    doc.text(`Amount Due: ${fmt(remaining)}`, detailX, detailY);
-    detailY += 7;
-
-    // Payment link
-    doc.setFont("helvetica", "normal");
     doc.setFontSize(6.5);
-    doc.setTextColor(100, 110, 130);
-    doc.text("Payment Link:", detailX, detailY);
-    detailY += 4;
-    doc.setTextColor(59, 91, 219);
+    setColor(doc, 110, 118, 140);
+    doc.text("PAY NOW:", txX, txY);
+    txY += 4.5;
+
+    // Clickable payment link
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7);
-    doc.textWithLink(paymentLink, detailX, detailY, { url: paymentLink });
+    setColor(doc, 42, 72, 188);
+    doc.textWithLink(paymentLink, txX, txY, { url: paymentLink });
+    txY += 6;
 
-    y = boxY + boxH + 8;
+    // Security note
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(5.5);
+    setColor(doc, 160, 165, 180);
+    doc.text("🔒 Secured by Razorpay · 256-bit encryption", txX, txY);
+
+    y = boxY + boxH + 6;
   } else {
-    // Fully paid — green confirmation
-    y += 4;
+    // ━━━ Fully Paid confirmation ━━━
+    y += 2;
     doc.setFillColor(240, 253, 244);
-    doc.roundedRect(margin, y - 4, contentW, 12, 2, 2, "F");
+    doc.roundedRect(m, y - 3, cw, 10, 2, 2, "F");
     doc.setDrawColor(22, 163, 74);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(margin, y - 4, contentW, 12, 2, 2, "S");
+    doc.setLineWidth(0.25);
+    doc.roundedRect(m, y - 3, cw, 10, 2, 2, "S");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(22, 163, 74);
-    doc.text("✓  FULLY PAID — Thank You!", w / 2, y + 3.5, { align: "center" });
-    y += 16;
+    doc.setFontSize(9);
+    setColor(doc, 22, 163, 74);
+    doc.text("✓  PAYMENT COMPLETE — Thank You!", w / 2, y + 3.5, { align: "center" });
+    y += 14;
   }
 
-  doc.setTextColor(0, 0, 0);
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // DIGITAL NOTICE
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(5.8);
+  setColor(doc, 170, 175, 190);
+  doc.text("Digitally Generated Invoice — No Signature Required", w / 2, y, { align: "center" });
+  y += 8;
 
-  // ═══════════════════════════════════════
-  // FOOTER
-  // ═══════════════════════════════════════
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // TRUST FOOTER — Brand Builder
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  drawLine(doc, y, margin, w, [200, 205, 215]);
-  y += 7;
+  // Divider
+  doc.setDrawColor(210, 215, 225);
+  doc.setLineWidth(0.2);
+  doc.line(m, y, rightEdge, y);
+  y += 6;
 
-  doc.setFont("helvetica", "normal");
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(7);
-  doc.setTextColor(150, 155, 170);
+  setColor(doc, 90, 98, 120);
   doc.text("Thank you for choosing Shree Umiya Electronics!", w / 2, y, { align: "center" });
   y += 4;
-  doc.text("For support, contact us on WhatsApp: +91 99999 99999", w / 2, y, { align: "center" });
-  y += 4;
-  doc.text("Terms: All services carry 30-day warranty. Products as per manufacturer warranty.", w / 2, y, { align: "center" });
 
-  // Page border
-  doc.setDrawColor(230, 232, 240);
-  doc.setLineWidth(0.2);
-  doc.rect(10, 5, w - 20, doc.internal.pageSize.getHeight() - 10, "S");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6);
+  setColor(doc, 150, 155, 170);
+  doc.text("For service support, contact us on WhatsApp: +91 99999 99999", w / 2, y, { align: "center" });
+  y += 4;
+  doc.text("Terms: Services carry 30-day warranty. Products as per manufacturer warranty.", w / 2, y, { align: "center" });
+  y += 5;
+
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(5.5);
+  setColor(doc, 180, 185, 200);
+  doc.text("Trusted Electronics Experts Since 2005", w / 2, y, { align: "center" });
 
   return doc;
 }
