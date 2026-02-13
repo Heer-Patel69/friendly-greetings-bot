@@ -1,25 +1,21 @@
 import { PageShell } from "@/components/layout/PageShell";
 import { NavLink } from "react-router-dom";
-import {
-  Store,
-  Wallet,
-  Truck,
-  Users,
-  Settings as SettingsIcon,
-  ChevronRight,
-} from "lucide-react";
-
-const links = [
-  { to: "/purchase", icon: Truck, label: "Purchases", desc: "Supplier orders" },
-  { to: "/expenses", icon: Wallet, label: "Expenses", desc: "Track spending" },
-  { to: "/customers", icon: Users, label: "Customers", desc: "CRM & contacts" },
-  { to: "/online-store", icon: Store, label: "Online Store", desc: "Mini store link" },
-  { to: "/settings", icon: SettingsIcon, label: "Settings", desc: "Configuration" },
-];
+import { Store, Wallet, Truck, Users, Settings as SettingsIcon, ChevronRight } from "lucide-react";
+import { useI18n } from "@/hooks/use-i18n";
 
 export default function More() {
+  const { t } = useI18n();
+
+  const links = [
+    { to: "/purchase", icon: Truck, label: t("nav.purchases"), desc: t("more.supplierOrders") },
+    { to: "/expenses", icon: Wallet, label: t("nav.expenses"), desc: t("more.trackSpending") },
+    { to: "/customers", icon: Users, label: t("nav.customers"), desc: t("more.crmContacts") },
+    { to: "/online-store", icon: Store, label: t("nav.onlineStore"), desc: t("more.miniStore") },
+    { to: "/settings", icon: SettingsIcon, label: t("nav.settings"), desc: t("more.configuration") },
+  ];
+
   return (
-    <PageShell title="More" subtitle="All modules">
+    <PageShell title={t("more.title")} subtitle={t("more.subtitle")}>
       <div className="space-y-2">
         {links.map((link) => (
           <NavLink
