@@ -21,6 +21,18 @@ export interface Customer {
   balance: number;
   purchases: number;
   lastVisit: string;
+  creditLimit?: number;
+  tags?: string[];
+  address?: string;
+}
+
+export interface CartItem {
+  id: string;
+  name: string;
+  sku: string;
+  price: number;
+  qty: number;
+  gst?: number;
 }
 
 export interface Sale {
@@ -28,6 +40,7 @@ export interface Sale {
   customer: string;
   customerPhone: string;
   items: string;
+  cartItems?: CartItem[];
   amount: number;
   paidAmount: number;
   status: "Paid" | "Partial" | "Pending";
@@ -37,6 +50,12 @@ export interface Sale {
   paymentLinkId?: string;
   razorpayPaymentId?: string;
   qrRef?: string;
+}
+
+export interface Favorite {
+  id: string;
+  productId: string;
+  position: number;
 }
 
 export interface Payment {
@@ -89,6 +108,7 @@ class DukaanDB extends Dexie {
   payments!: Table<Payment, string>;
   jobCards!: Table<JobCard, string>;
   syncQueue!: Table<SyncQueueItem, number>;
+  favorites!: Table<Favorite, string>;
 
   constructor() {
     super("dukaanos");
@@ -100,6 +120,22 @@ class DukaanDB extends Dexie {
       payments: "id, saleId, timestamp",
       jobCards: "id, status, createdAt, customerPhone",
       syncQueue: "++id, table, synced, createdAt",
+    });
+
+    this.version(2).stores({
+      products: "id, sku, category, name",
+      customers: "id, phone, name",
+      sales: "id, customer, status, timestamp",
+      payments: "id, saleId, timestamp, customer",
+      jobCards: "id, status, createdAt, customerPhone",
+      syncQueue: "++id, table, synced, createdAt",
+      favorites: "id, productId, position",
+    }).upgrade(tx => {
+      return tx.table("customers").toCollection().modify(c => {
+        c.creditLimit = c.creditLimit ?? 0;
+        c.tags = c.tags ?? [];
+        c.address = c.address ?? "";
+      });
     });
   }
 }

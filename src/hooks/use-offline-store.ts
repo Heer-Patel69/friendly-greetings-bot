@@ -1,11 +1,11 @@
 import { useCallback } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, queueSync } from "@/lib/offline-db";
-import type { Product, Customer, Sale, Payment, JobCard } from "@/lib/offline-db";
+import type { Product, Customer, Sale, Payment, JobCard, Favorite } from "@/lib/offline-db";
 import type { Table } from "dexie";
 
 // Re-export types for backward compatibility
-export type { Product, Customer, Sale, Payment, JobCard, JobStatus } from "@/lib/offline-db";
+export type { Product, Customer, Sale, Payment, JobCard, JobStatus, CartItem, Favorite } from "@/lib/offline-db";
 
 // ── Specialized hooks (drop-in replacements for use-local-store) ──
 
@@ -92,4 +92,15 @@ export function useJobCards() {
     await queueSync("jobCards", "delete", id, { id });
   }, []);
   return { items, add, update, remove };
+}
+
+export function useFavorites() {
+  const items = useLiveQuery(() => db.favorites.orderBy("position").toArray(), [], []) as Favorite[];
+  const add = useCallback(async (item: Favorite) => {
+    await db.favorites.put(item);
+  }, []);
+  const remove = useCallback(async (id: string) => {
+    await db.favorites.delete(id);
+  }, []);
+  return { items, add, remove };
 }
