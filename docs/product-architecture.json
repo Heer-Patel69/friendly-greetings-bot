@@ -1,0 +1,509 @@
+{
+  "meta": {
+    "product": "DukaanOS",
+    "version": "1.0",
+    "generated": "2026-02-13",
+    "description": "Consolidated product architecture JSON for engineering handoff"
+  },
+  "features": {
+    "quick_sell_pos": {
+      "outcome": "Enable a shopkeeper to bill a customer in under 10 seconds with 3 taps: pick product → confirm cart → collect payment.",
+      "priority": "MVP",
+      "complexity": "Large",
+      "screens": ["/pos"],
+      "primary_table": {
+        "name": "sales",
+        "schema": {
+          "id": "string (invoice number: SUE-YYYY-XXXX)",
+          "store_id": "uuid",
+          "customer_id": "string (nullable for walk-in)",
+          "customer_name": "string",
+          "customer_phone": "string",
+          "cart_items": [
+            {
+              "product_id": "string",
+              "name": "string",
+              "sku": "string",
+              "qty": "integer",
+              "unit_price": "number",
+              "gst_pct": "number",
+              "gst_amount": "number",
+              "total": "number"
+            }
+          ],
+          "subtotal": "number",
+          "gst_total": "number",
+          "discount": "number",
+          "grand_total": "number",
+          "paid_amount": "number",
+          "balance": "number",
+          "status": "enum: Paid | Partial | Pending",
+          "payment_method": "enum: Cash | UPI | Card | Online",
+          "payment_ref": "string (nullable)",
+          "invoice_number": "string",
+          "pdf_url": "string (nullable)",
+          "created_at": "timestamp",
+          "updated_at": "timestamp",
+          "synced": "boolean"
+        }
+      },
+      "api_endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/sales",
+          "description": "Create new sale"
+        },
+        {
+          "method": "GET",
+          "path": "/api/sales?store_id=X&status=Pending",
+          "description": "List sales with filters"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/sales/:id",
+          "description": "Update sale status/payment"
+        }
+      ],
+      "offline_strategy": "Full offline. Sale created in IndexedDB with synced=false. Invoice number generated locally with store prefix. On sync: push to server, server may reassign canonical ID.",
+      "conflict_resolution": "Both offline sales accepted. Stock = server_stock - sum(offline_decrements). Invoice IDs remapped by server if collision.",
+      "edge_cases": [
+        "Cart empty → disable Charge button",
+        "Walk-in customer → no customer_id",
+        "Product stock = 0 → allow sale for service items",
+        "Partial payment ₹0 → reject",
+        "Duplicate invoice number → server reassigns suffix"
+      ],
+      "differentiators": [
+        "3-tap billing with favorites row (sub-5s checkout)",
+        "Voice search in Hindi/Gujarati",
+        "Instant WhatsApp invoice with payment QR"
+      ]
+    },
+    "customer_ledger_udhaar": {
+      "outcome": "Track who owes money, record partial payments, and send WhatsApp reminders — replacing physical khata books.",
+      "priority": "MVP",
+      "complexity": "Medium",
+      "screens": ["/customers"],
+      "primary_table": {
+        "name": "customers",
+        "schema": {
+          "id": "string",
+          "store_id": "uuid",
+          "name": "string",
+          "phone": "string",
+          "email": "string (nullable)",
+          "address": "string (nullable)",
+          "balance": "number (outstanding amount)",
+          "total_purchases": "integer",
+          "total_paid": "number",
+          "credit_limit": "number",
+          "tags": "string[]",
+          "last_visit": "timestamp",
+          "created_at": "timestamp",
+          "synced": "boolean"
+        }
+      },
+      "api_endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/payments",
+          "description": "Record payment against customer balance"
+        },
+        {
+          "method": "GET",
+          "path": "/api/customers?store_id=X&has_balance=true",
+          "description": "List customers with outstanding balance"
+        }
+      ],
+      "offline_strategy": "Payment recorded in IndexedDB, customer.balance decremented locally. On sync: server recalculates authoritative balance.",
+      "conflict_resolution": "Both payments valid. Server balance = previous - sum(all payments).",
+      "differentiators": [
+        "Aging buckets (0-30d/30-60d/60-90d/90d+)",
+        "Auto-reminder via Automations engine",
+        "Payment link in WhatsApp reminder"
+      ]
+    },
+    "inventory_engine": {
+      "outcome": "Manage product catalog with multi-image uploads, barcode scanning, cost tracking, GST rates, reorder alerts, and supplier linking.",
+      "priority": "MVP",
+      "complexity": "Large",
+      "screens": ["/inventory"],
+      "primary_table": {
+        "name": "products",
+        "schema": {
+          "id": "string",
+          "store_id": "uuid",
+          "name": "string",
+          "sku": "string",
+          "barcode": "string (nullable)",
+          "category": "string",
+          "description": "string (nullable)",
+          "price": "number",
+          "cost": "number",
+          "gst_pct": "number",
+          "stock": "integer",
+          "reorder_level": "integer",
+          "supplier_id": "string (nullable)",
+          "image_urls": "string[]",
+          "cover_image_url": "string (nullable)",
+          "visibility": "enum: online | offline | both",
+          "is_active": "boolean",
+          "created_at": "timestamp",
+          "updated_at": "timestamp",
+          "synced": "boolean"
+        }
+      },
+      "differentiators": [
+        "Camera-first multi-image with drag-to-reorder",
+        "Barcode auto-lookup from existing catalog",
+        "Smart reorder suggestions based on sales velocity"
+      ]
+    },
+    "online_mini_store": {
+      "outcome": "Give every shopkeeper a sharable public store URL with product catalog, WhatsApp ordering, and optional online payments.",
+      "priority": "Phase 2",
+      "complexity": "Large",
+      "screens": ["/online-store", "/store/:slug"],
+      "primary_table": {
+        "name": "store_profiles",
+        "schema": {
+          "id": "uuid",
+          "owner_id": "uuid (FK auth.users)",
+          "name": "string",
+          "slug": "string (unique)",
+          "logo_url": "string (nullable)",
+          "description": "string (nullable)",
+          "address": "string",
+          "city": "string",
+          "state": "string",
+          "phone": "string",
+          "whatsapp": "string",
+          "gstin": "string (nullable)",
+          "categories": "string[]",
+          "is_open": "boolean",
+          "theme_color": "string (nullable)",
+          "created_at": "timestamp"
+        }
+      },
+      "differentiators": [
+        "2-minute store setup in onboarding wizard",
+        "WhatsApp-first enquiry with product prefill",
+        "QR code for physical display at shop counter"
+      ]
+    },
+    "pdf_invoices": {
+      "outcome": "Generate professional GST-compliant invoices as shareable PDFs with a dynamic QR code for outstanding balance payment.",
+      "priority": "MVP",
+      "complexity": "Medium",
+      "screens": ["/sales", "/pos"],
+      "primary_table": {
+        "name": "invoices",
+        "schema": {
+          "id": "string (= sale_id)",
+          "sale_id": "string",
+          "store_id": "uuid",
+          "pdf_url": "string (cloud storage URL)",
+          "pdf_generated_at": "timestamp",
+          "payment_link_url": "string (nullable)",
+          "payment_link_id": "string (nullable)",
+          "qr_data": "string (UPI intent URI)",
+          "sent_via_whatsapp": "boolean",
+          "sent_at": "timestamp (nullable)"
+        }
+      },
+      "differentiators": [
+        "Dynamic QR that only shows for unpaid balances",
+        "One-tap WhatsApp share with PDF attachment",
+        "Digitally Generated legal notice (no signature needed)"
+      ]
+    },
+    "razorpay_integration": {
+      "outcome": "Accept online payments via UPI, cards, and net banking with automatic reconciliation against invoices.",
+      "priority": "Phase 2",
+      "complexity": "Large",
+      "screens": ["/sales"],
+      "primary_table": {
+        "name": "payment_events",
+        "schema": {
+          "id": "uuid",
+          "store_id": "uuid",
+          "sale_id": "string",
+          "razorpay_payment_id": "string",
+          "razorpay_payment_link_id": "string",
+          "razorpay_signature": "string",
+          "amount": "integer (paise)",
+          "currency": "string (INR)",
+          "status": "enum: captured | failed | refunded",
+          "method": "enum: upi | card | netbanking | wallet",
+          "contact": "string",
+          "webhook_verified": "boolean",
+          "received_at": "timestamp",
+          "processed_at": "timestamp"
+        }
+      },
+      "differentiators": [
+        "Auto-reconciliation via webhooks (no manual entry)",
+        "Cryptographic signature verification",
+        "UPI QR fallback when Razorpay is unavailable"
+      ]
+    },
+    "job_cards": {
+      "outcome": "Track repair jobs from intake to delivery with photos, diagnosis, parts estimation, customer approval, and automated follow-up reminders.",
+      "priority": "MVP",
+      "complexity": "Large",
+      "screens": ["/job-cards"],
+      "primary_table": {
+        "name": "job_cards",
+        "schema": {
+          "id": "string (JC-XXXX)",
+          "store_id": "uuid",
+          "customer_name": "string",
+          "customer_phone": "string",
+          "device_type": "string",
+          "device_brand": "string",
+          "device_model": "string",
+          "serial_number": "string",
+          "complaints": "string[]",
+          "diagnosis": "string",
+          "parts_estimate": [{"name": "string", "cost": "number"}],
+          "parts_used": [{"product_id": "string", "qty": "integer", "name": "string", "cost": "number"}],
+          "labor_charge": "number",
+          "total_estimate": "number",
+          "advance_paid": "number",
+          "status": "enum: Received | Diagnosed | Approved | In Progress | Ready | Delivered",
+          "approved": "boolean",
+          "photos": "string[] (storage URLs)",
+          "work_log": [{"timestamp": "timestamp", "entry": "string", "tech": "string (nullable)"}],
+          "notes": "string",
+          "invoice_id": "string (nullable)",
+          "completed_at": "timestamp (nullable)",
+          "created_at": "timestamp",
+          "synced": "boolean"
+        }
+      },
+      "differentiators": [
+        "WhatsApp estimate approval (no app install for customer)",
+        "Auto-reminder on delivery completion",
+        "Parts pulled from live inventory with stock decrement"
+      ]
+    },
+    "reports_analytics": {
+      "outcome": "Real-time business intelligence with revenue trends, top products, inventory valuation, and customer analytics — all computed from local data.",
+      "priority": "Phase 2",
+      "complexity": "Medium",
+      "screens": ["/reports"],
+      "primary_table": null,
+      "note": "No dedicated table. Aggregated from sales, products, customers at query time.",
+      "differentiators": [
+        "100% offline-capable analytics (client-computed)",
+        "CSV export for all report types",
+        "Customer-level order frequency and credit analysis"
+      ]
+    },
+    "offline_sync": {
+      "outcome": "Every operation works without internet, changes queue for sync, with clear visibility and conflict resolution.",
+      "priority": "MVP",
+      "complexity": "Large",
+      "screens": ["Global (ConnectivityDot, SyncStatusSheet)"],
+      "primary_table": {
+        "name": "sync_queue",
+        "schema": {
+          "id": "auto-increment integer",
+          "table": "string",
+          "operation": "enum: add | update | delete",
+          "record_id": "string",
+          "payload": "string (JSON)",
+          "created_at": "timestamp (ms)",
+          "synced": "integer (0 | 1)",
+          "retry_count": "integer",
+          "last_error": "string (nullable)",
+          "failed_at": "timestamp (nullable)",
+          "conflict_resolution": "enum: pending | resolved | conflict"
+        }
+      },
+      "conflict_rules": {
+        "same_record_edited": "Last-writer-wins by timestamp",
+        "concurrent_sales": "Both accepted, IDs remapped by server",
+        "stock_decrements": "Additive merge (all decrements apply)",
+        "concurrent_payments": "Additive merge (all payments valid)",
+        "delete_vs_update": "Delete wins"
+      },
+      "differentiators": [
+        "Visual sync status with per-item retry/discard",
+        "Automatic conflict detection and resolution",
+        "Works for days offline without data loss"
+      ]
+    },
+    "supplier_quick_order": {
+      "outcome": "Manage suppliers, auto-detect low stock, and send reorder requests via WhatsApp.",
+      "priority": "Phase 2",
+      "complexity": "Medium",
+      "screens": ["/purchase"],
+      "primary_table": {
+        "name": "purchase_orders",
+        "schema": {
+          "id": "string",
+          "store_id": "uuid",
+          "supplier_id": "string",
+          "supplier_name": "string",
+          "items": [{"product_id": "string", "name": "string", "sku": "string", "qty": "integer", "cost": "number"}],
+          "total": "number",
+          "status": "enum: Draft | Sent | Received | Cancelled",
+          "sent_at": "timestamp (nullable)",
+          "received_at": "timestamp (nullable)",
+          "created_at": "timestamp",
+          "notes": "string (nullable)",
+          "synced": "boolean"
+        }
+      },
+      "reorder_algorithm": "weeklyAvg = (units sold in 30 days) / 4.3; suggested = max(reorderLevel, ceil(weeklyAvg * 2), 10)",
+      "differentiators": [
+        "Sales-velocity-based quantity suggestions",
+        "One-tap WhatsApp reorder with structured message",
+        "Automatic stock increment on receive"
+      ]
+    },
+    "automation_reminders": {
+      "outcome": "Automate recurring maintenance reminders, AMC renewals, and payment follow-ups via WhatsApp.",
+      "priority": "Phase 2",
+      "complexity": "Medium",
+      "screens": ["/automations"],
+      "primary_table": {
+        "name": "reminders",
+        "schema": {
+          "id": "string",
+          "store_id": "uuid",
+          "type": "enum: AMC | FilterChange | Service | PaymentFollowup | Custom",
+          "customer_id": "string",
+          "customer_name": "string",
+          "customer_phone": "string",
+          "title": "string",
+          "message": "string (WhatsApp template)",
+          "frequency": "enum: once | monthly | quarterly | biannual | annual",
+          "next_due_at": "timestamp (ms)",
+          "last_triggered_at": "timestamp (nullable)",
+          "last_service_date": "timestamp (nullable)",
+          "job_card_id": "string (nullable)",
+          "device_info": "string (nullable)",
+          "status": "enum: Active | Paused | Completed | Cancelled",
+          "created_at": "timestamp",
+          "notes": "string (nullable)",
+          "synced": "boolean"
+        }
+      },
+      "service_intervals": {
+        "AC": "180 days (pre-summer scheduling)",
+        "RO": "90 days (filter change)",
+        "Geyser": "365 days",
+        "Washing Machine": "365 days",
+        "Chimney": "180 days"
+      },
+      "differentiators": [
+        "Seasonal-aware scheduling (AC before summer)",
+        "Auto-create from job card completion",
+        "Hindi/Gujarati/English template library"
+      ]
+    },
+    "auth_multistore_roles": {
+      "outcome": "Secure login, multi-store data isolation, and role-based access so one app serves the whole team.",
+      "priority": "Phase 2",
+      "complexity": "Large",
+      "screens": ["/auth", "/onboarding", "/settings"],
+      "primary_table": {
+        "name": "user_roles",
+        "schema": {
+          "id": "uuid",
+          "user_id": "uuid (FK auth.users)",
+          "role": "enum: owner | cashier | technician",
+          "created_at": "timestamp"
+        }
+      },
+      "role_matrix": {
+        "owner": "Full access to all features",
+        "cashier": "Dashboard (limited), Sales, POS, Customers (view only)",
+        "technician": "Dashboard (limited), Job Cards only"
+      },
+      "security": [
+        "Roles in separate user_roles table (not on profile)",
+        "Security definer function has_role() prevents RLS recursion",
+        "JWT-based auth with refresh tokens",
+        "All data queries scoped by store_id"
+      ],
+      "differentiators": [
+        "Skip-able auth (works without login in local mode)",
+        "2-minute onboarding wizard",
+        "Granular role-based navigation filtering"
+      ]
+    },
+    "settings_export_import": {
+      "outcome": "Configure business profile, invoice templates, staff access, and data backup from a single settings hub.",
+      "priority": "Phase 3",
+      "complexity": "Small",
+      "screens": ["/settings"],
+      "primary_table": null,
+      "note": "Uses store_profiles table + localStorage for preferences",
+      "differentiators": [
+        "One-tap CSV export for all data types",
+        "CSV import with preview and column mapping",
+        "Full ZIP backup of all business data"
+      ]
+    }
+  },
+  "sitemap": {
+    "/": "Marketing landing page",
+    "/stores": "Store directory",
+    "/store/:slug": "Public store profile",
+    "/auth": "Login / Register",
+    "/onboarding": "Store setup wizard",
+    "/pos": "Quick-Sell POS (fullscreen)",
+    "/dashboard": "Command Center",
+    "/sales": "Sales & invoice history",
+    "/inventory": "Product catalog",
+    "/purchase": "Suppliers & procurement",
+    "/expenses": "Expense tracking",
+    "/customers": "CRM & Udhaar ledger",
+    "/job-cards": "Repair tracking",
+    "/online-store": "Store profile editor",
+    "/automations": "Reminders & follow-ups",
+    "/reports": "Analytics & charts",
+    "/settings": "App configuration",
+    "/more": "Mobile nav overflow"
+  },
+  "thirty_day_plan": {
+    "week_1": [
+      "IndexedDB schema finalized (v6)",
+      "Auth context + Supabase client + ProtectedRoute",
+      "Auth page + onboarding wizard",
+      "Quick-Sell POS (grid, cart, payment)",
+      "POS favorites + voice search",
+      "Invoice PDF + WhatsApp share"
+    ],
+    "week_2": [
+      "Customer ledger + payment collection",
+      "Aging buckets + WhatsApp reminders",
+      "Inventory multi-image + barcode + CSV",
+      "Product detail editable view",
+      "Job Cards creation wizard + status",
+      "Job Cards board view + photos + parts"
+    ],
+    "week_3": [
+      "Supplier management + POs",
+      "Quick reorder + quantity suggestions",
+      "WhatsApp reorder + receive stock",
+      "Automations CRUD + templates",
+      "Smart scheduling (seasonal, device)",
+      "Dashboard reminders + live stats"
+    ],
+    "week_4": [
+      "Reports (trends, top products, charts)",
+      "CSV export all types",
+      "Sync UI (status, retry, discard)",
+      "Settings (profile, invoice, staff)",
+      "Online mini-store + public profile",
+      "Razorpay integration + webhooks",
+      "E2E testing + offline scenarios",
+      "Lighthouse 90+ + WCAG AA + deploy"
+    ]
+  },
+  "pitch": "DukaanOS is the offline-first operating system for India's 63 million micro-businesses — replacing paper khata books, scattered WhatsApp orders, and expensive POS hardware with a ₹0-setup mobile app that does billing, inventory, CRM, repair tracking, and automated customer follow-ups in Hindi, Gujarati, and English. Unlike Khatabook (ledger only) or Vyapar (desktop-heavy), DukaanOS combines 3-tap POS, job card management, and WhatsApp-native automation in a single offline-first experience purpose-built for shopkeepers who've never used software before."
+}
